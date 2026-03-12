@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SVG de ejemplo: Mini datacenter con 4 hosts
+  Cada <g data-cell-id="..."> es un target que el plugin resolverá.
+  Las shapes con fill="#cccbcb" serán coloreadas dinámicamente.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" font-family="Inter, sans-serif">
+  <!-- Background -->
+  <rect width="800" height="450" fill="#1a1a2e" rx="12"/>
+
+  <!-- Title -->
+  <text x="400" y="35" text-anchor="middle" fill="#e0e0e0" font-size="18" font-weight="600">
+    🖥️ Mini Datacenter – SVG Flow Demo
+  </text>
+
+  <!-- Líneas de conexión -->
+  <line x1="400" y1="100" x2="150" y2="180" stroke="#444" stroke-width="2" stroke-dasharray="6,3"/>
+  <line x1="400" y1="100" x2="350" y2="180" stroke="#444" stroke-width="2" stroke-dasharray="6,3"/>
+  <line x1="400" y1="100" x2="450" y2="180" stroke="#444" stroke-width="2" stroke-dasharray="6,3"/>
+  <line x1="400" y1="100" x2="650" y2="180" stroke="#444" stroke-width="2" stroke-dasharray="6,3"/>
+
+  <!-- Router central -->
+  <g data-cell-id="router-core">
+    <rect x="355" y="60" width="90" height="50" rx="8" fill="#cccbcb" stroke="#555" stroke-width="1.5"/>
+    <text x="400" y="90" text-anchor="middle" fill="#1a1a2e" font-size="12" font-weight="600">Router</text>
+  </g>
+
+  <!-- Host 1: webserver -->
+  <g data-cell-id="webserver">
+    <rect x="80" y="180" width="140" height="90" rx="10" fill="#cccbcb" stroke="#555" stroke-width="1.5"/>
+    <text x="150" y="215" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="600">Web Server</text>
+    <text x="150" y="235" text-anchor="middle" fill="#333" font-size="10">nginx + node</text>
+    <!-- Icono server -->
+    <rect x="105" y="248" width="90" height="12" rx="3" fill="rgba(0,0,0,0.15)"/>
+    <circle cx="115" cy="254" r="3" fill="#666"/>
+    <circle cx="125" cy="254" r="3" fill="#666"/>
+  </g>
+
+  <!-- Host 2: database -->
+  <g data-cell-id="database">
+    <rect x="280" y="180" width="140" height="90" rx="10" fill="#cccbcb" stroke="#555" stroke-width="1.5"/>
+    <text x="350" y="215" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="600">Database</text>
+    <text x="350" y="235" text-anchor="middle" fill="#333" font-size="10">PostgreSQL</text>
+    <rect x="305" y="248" width="90" height="12" rx="3" fill="rgba(0,0,0,0.15)"/>
+    <circle cx="315" cy="254" r="3" fill="#666"/>
+    <circle cx="325" cy="254" r="3" fill="#666"/>
+    <circle cx="335" cy="254" r="3" fill="#666"/>
+  </g>
+
+  <!-- Host 3: appserver -->
+  <g data-cell-id="appserver">
+    <rect x="380" y="180" width="140" height="90" rx="10" fill="#cccbcb" stroke="#555" stroke-width="1.5"/>
+    <text x="450" y="215" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="600">App Server</text>
+    <text x="450" y="235" text-anchor="middle" fill="#333" font-size="10">API + Workers</text>
+    <rect x="405" y="248" width="90" height="12" rx="3" fill="rgba(0,0,0,0.15)"/>
+    <circle cx="415" cy="254" r="3" fill="#666"/>
+  </g>
+
+  <!-- Host 4: monitoring -->
+  <g data-cell-id="monitoring">
+    <rect x="580" y="180" width="140" height="90" rx="10" fill="#cccbcb" stroke="#555" stroke-width="1.5"/>
+    <text x="650" y="215" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="600">Monitoring</text>
+    <text x="650" y="235" text-anchor="middle" fill="#333" font-size="10">Grafana + Prom</text>
+    <rect x="605" y="248" width="90" height="12" rx="3" fill="rgba(0,0,0,0.15)"/>
+    <circle cx="615" cy="254" r="3" fill="#666"/>
+    <circle cx="625" cy="254" r="3" fill="#666"/>
+  </g>
+
+  <!-- Conexiones inferiores (storage) -->
+  <line x1="350" y1="270" x2="400" y2="340" stroke="#444" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <line x1="450" y1="270" x2="400" y2="340" stroke="#444" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- Storage compartido -->
+  <g data-cell-id="storage">
+    <ellipse cx="400" cy="370" rx="80" ry="35" fill="#cccbcb" stroke="#555" stroke-width="1.5"/>
+    <text x="400" y="365" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="600">Storage</text>
+    <text x="400" y="383" text-anchor="middle" fill="#333" font-size="10">NFS / SAN</text>
+  </g>
+
+  <!-- Leyenda -->
+  <g transform="translate(20, 400)">
+    <text fill="#888" font-size="10">Leyenda:</text>
+    <circle cx="70" cy="-3" r="5" fill="#73bf69"/><text x="80" fill="#888" font-size="10">OK</text>
+    <circle cx="115" cy="-3" r="5" fill="#ff9830"/><text x="125" fill="#888" font-size="10">WARN</text>
+    <circle cx="175" cy="-3" r="5" fill="#f2495c"/><text x="185" fill="#888" font-size="10">CRIT</text>
+    <circle cx="225" cy="-3" r="5" fill="#8e8e8e"/><text x="235" fill="#888" font-size="10">N/A</text>
+  </g>
+</svg>

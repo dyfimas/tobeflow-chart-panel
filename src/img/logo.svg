@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4FC3F7"/>
+      <stop offset="100%" stop-color="#0277BD"/>
+    </linearGradient>
+    <linearGradient id="gLine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4FC3F7" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#0288D1" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#66BB6A"/>
+      <stop offset="100%" stop-color="#388E3C"/>
+    </linearGradient>
+    <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFA726"/>
+      <stop offset="100%" stop-color="#EF6C00"/>
+    </linearGradient>
+    <linearGradient id="gRed" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#EF5350"/>
+      <stop offset="100%" stop-color="#C62828"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="64" height="64" rx="12" fill="#111827"/>
+
+  <!-- Left: Data bars (raw data source) -->
+  <rect x="7" y="24" width="3" height="16" rx="1.5" fill="url(#gBlue)" opacity="0.6"/>
+  <rect x="12" y="20" width="3" height="24" rx="1.5" fill="url(#gBlue)" opacity="0.8"/>
+  <rect x="17" y="27" width="3" height="10" rx="1.5" fill="url(#gBlue)" opacity="0.5"/>
+
+  <!-- Flow lines: data → center interpreter -->
+  <path d="M21 32 L27 32" stroke="url(#gLine)" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 2"/>
+
+  <!-- Center: Interpreter node (hexagonal lens shape) -->
+  <polygon points="32,17 41,23 41,41 32,47 23,41 23,23" fill="url(#gBlue)" opacity="0.15" stroke="url(#gBlue)" stroke-width="1.5"/>
+  <polygon points="32,21 38,25.5 38,38.5 32,43 26,38.5 26,25.5" fill="url(#gBlue)" opacity="0.25"/>
+  <!-- Inner pulse/wave inside interpreter -->
+  <path d="M27 32 L29 28 L31 35 L33 29 L35 33 L37 32" stroke="#4FC3F7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Flow lines: interpreter → output indicators -->
+  <path d="M41 26 L47 18" stroke="url(#gLine)" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M41 32 L47 32" stroke="url(#gLine)" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M41 38 L47 46" stroke="url(#gLine)" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Right: Status output dots (interpreted results) -->
+  <!-- Green = OK -->
+  <circle cx="51" cy="16" r="4.5" fill="url(#gGreen)"/>
+  <path d="M49 16 L50.5 17.5 L53 15" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Amber = Warning -->
+  <circle cx="52" cy="32" r="4.5" fill="url(#gAmber)"/>
+  <line x1="52" y1="29.5" x2="52" y2="32.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/>
+  <circle cx="52" cy="34" r="0.7" fill="white"/>
+
+  <!-- Red = Critical -->
+  <circle cx="51" cy="48" r="4.5" fill="url(#gRed)"/>
+  <line x1="49.5" y1="46.5" x2="52.5" y2="49.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="52.5" y1="46.5" x2="49.5" y2="49.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Subtle glow behind interpreter -->
+  <circle cx="32" cy="32" r="14" fill="#4FC3F7" opacity="0.04"/>
+</svg>
