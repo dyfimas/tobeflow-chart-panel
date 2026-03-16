@@ -305,7 +305,8 @@ export function validateMapping(
     metrics: Array<{ hostField?: string; filterPattern?: string; field: string }>;
   },
   analyses: Map<string, RefIdAnalysis>,
-  availableHosts: string[]
+  availableHosts: string[],
+  defaultHostField?: string
 ): MappingValidation[] {
   const warnings: MappingValidation[] = [];
 
@@ -367,8 +368,8 @@ export function validateMapping(
   for (let i = 0; i < mapping.metrics.length; i++) {
     const met = mapping.metrics[i];
 
-    // filterPattern without hostField
-    if (met.filterPattern && !met.hostField) {
+    // filterPattern without hostField (check metric, mapping, and panel default)
+    if (met.filterPattern && !met.hostField && !mapping.hostField && !defaultHostField) {
       warnings.push({
         level: 'warning',
         message: `Metrica #${i + 1}: filterPattern requiere un hostField configurado.`,

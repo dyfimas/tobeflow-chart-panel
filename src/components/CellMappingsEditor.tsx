@@ -573,7 +573,7 @@ export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }
         })
       )
     );
-    return validateMapping(m, refIdAnalyses, allHosts);
+    return validateMapping(m, refIdAnalyses, allHosts, (context.options?.hostField as string) || 'host.name');
   }, [context.data, context.options?.hostField, refIdAnalyses]);
 
   // ── Cell ID options from SVG ──

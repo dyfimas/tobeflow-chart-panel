@@ -83,6 +83,14 @@ export const MetricAssignmentRow: React.FC<MetricAssignmentRowProps> = ({
           variant="secondary"
           onClick={onToggleMetricCollapse}
         />
+        <span style={{
+          fontSize: 9, fontWeight: 600, flexShrink: 0, marginRight: 4,
+          padding: '1px 5px', borderRadius: 3,
+          background: isGenericValueField ? 'rgba(87,148,242,0.15)' : 'rgba(115,191,105,0.15)',
+          color: isGenericValueField ? '#5794F2' : '#73BF69',
+        }}>
+          {isGenericValueField ? t('metric.typeBadge.query') : t('metric.typeBadge.metric')}
+        </span>
         <span
           style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, cursor: 'pointer' }}
           onClick={onToggleMetricCollapse}
@@ -119,115 +127,84 @@ export const MetricAssignmentRow: React.FC<MetricAssignmentRowProps> = ({
               />
             </div>
           )}
-          {/* Value field (X) */}
-          <Select
-            options={metricFieldOpts}
-            value={
-              mt.field
-                ? metricFieldOpts.find((o) => o.value === mt.field) || { label: mt.field, value: mt.field }
-                : undefined
-            }
-            onChange={(v) => updateMetric(mappingId, mi, { field: v?.value || '' })}
-            allowCustomValue
-            isClearable
-            placeholder={t('metric.valueField')}
-            menuPlacement="auto"
-          />
-          {isGenericValueField && (
-            <div style={{ fontSize: 10, opacity: 0.75, marginTop: -1 }}>
-              {t('metric.metricsQueryDetected')} (ej: <code>system.filesystem.mount_point</code>)
-            </div>
-          )}
-          {/* Host field + filter pattern row (per-metric) */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 120px', minWidth: 100 }}>
-              <Select
-                options={metricFieldOpts}
-                value={
-                  mt.hostField
-                    ? metricFieldOpts.find((o) => o.value === mt.hostField) || { label: mt.hostField, value: mt.hostField }
-                    : undefined
-                }
-                onChange={(v) => updateMetric(mappingId, mi, { hostField: v?.value || '' })}
-                allowCustomValue
-                isClearable
-                placeholder={`Host field: ${defaultHostField}`}
-                menuPlacement="auto"
-              />
-            </div>
-            <div style={{ flex: '1 1 120px', minWidth: 100 }}>
+
+          {isGenericValueField ? (
+            /* ─── QUERY TYPE (_value/value): simplified layout ─── */
+            <>
+              {/* ── Type badge + Title ── */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 11, fontWeight: 600, opacity: 0.85,
+                borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                paddingBottom: 3,
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 3,
+                  background: 'rgba(87,148,242,0.15)', color: '#5794F2',
+                }}>{t('metric.typeBadge.query')}</span>
+                {mt.field || t('metric.noField')}
+                {mt.alias && <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({mt.alias})</span>}
+              </div>
+
+              {/* ── Pattern filter ── */}
+              <div style={{ fontSize: 10, opacity: 0.7 }}>{t('metric.pattern.label')}</div>
               <Select
                 options={filterPatternSuggestions}
                 value={mt.filterPattern ? { label: mt.filterPattern, value: mt.filterPattern } : undefined}
                 onChange={(v) => updateMetric(mappingId, mi, { filterPattern: v?.value || '' })}
                 allowCustomValue
                 isClearable
-                placeholder="Pattern (ej: *BAMBOO*)"
+                placeholder={t('metric.pattern.placeholder')}
                 menuPlacement="auto"
               />
-            </div>
-          </div>
-          {/* Pattern match count indicator */}
-          {info && (() => {
-            const isOk = info.count > 0;
-            const maxShow = 5;
-            const matchList = info.matches.slice(0, maxShow).join(', ');
-            const more = info.count > maxShow ? ` (+${info.count - maxShow})` : '';
-            return (
-              <div style={{
-                fontSize: 10, padding: '2px 8px', marginTop: -1,
-                color: isOk ? (isDark ? '#73BF69' : '#37872D') : (isDark ? '#FF7383' : '#C4162A'),
-                lineHeight: 1.4,
-              }}>
-                {isOk
-                  ? `${info.count} match${info.count !== 1 ? 'es' : ''}: ${matchList}${more}`
-                  : t('metric.noMatches')
-                }
-              </div>
-            );
-          })()}
-          {/* Group by field (Y) */}
-          <Select
-            options={metricFieldOpts}
-            value={
-              mt.groupByField
-                ? metricFieldOpts.find((o) => o.value === mt.groupByField) || { label: mt.groupByField, value: mt.groupByField }
-                : undefined
-            }
-            onChange={(v) => updateMetric(mappingId, mi, { groupByField: v?.value || '' })}
-            allowCustomValue
-            isClearable
-            placeholder={t('metric.groupBy')}
-            menuPlacement="auto"
-          />
-          {/* Data type (UnitPicker) */}
-          <UnitPicker
-            value={LEGACY_TO_GRAFANA_UNIT[mt.dataType || 'auto'] || mt.dataType || ''}
-            onChange={(unit) => updateMetric(mappingId, mi, { dataType: unit || 'auto' })}
-          />
-          {/* Aggregation + alias row */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 110px', minWidth: 90 }}>
+              {/* Pattern match indicator */}
+              {info && (() => {
+                const isOk = info.count > 0;
+                const maxShow = 5;
+                const matchList = info.matches.slice(0, maxShow).join(', ');
+                const more = info.count > maxShow ? ` (+${info.count - maxShow})` : '';
+                return (
+                  <div style={{
+                    fontSize: 10, padding: '2px 8px', marginTop: -3,
+                    color: isOk ? (isDark ? '#73BF69' : '#37872D') : (isDark ? '#FF7383' : '#C4162A'),
+                    lineHeight: 1.4,
+                  }}>
+                    {isOk
+                      ? `${info.count} match${info.count !== 1 ? 'es' : ''}: ${matchList}${more}`
+                      : t('metric.noMatches')
+                    }
+                  </div>
+                );
+              })()}
+
+              {/* ── Unit ── */}
+              <div style={{ fontSize: 10, opacity: 0.7 }}>{t('metric.unit.short')}</div>
+              <UnitPicker
+                value={LEGACY_TO_GRAFANA_UNIT[mt.dataType || 'auto'] || mt.dataType || ''}
+                onChange={(unit) => updateMetric(mappingId, mi, { dataType: unit || 'auto' })}
+              />
+
+              {/* ── Aggregation ── */}
+              <div style={{ fontSize: 10, opacity: 0.7 }}>{t('metric.aggregation.label')}</div>
               <Select
                 options={AGGREGATION_OPTIONS}
                 value={AGGREGATION_OPTIONS.find((o) => o.value === (mt.aggregation || 'last'))}
                 onChange={(v) => updateMetric(mappingId, mi, { aggregation: (v?.value || 'last') as AggregationType })}
-                placeholder="Aggregation"
+                placeholder={t('metric.aggregation.placeholder')}
                 menuPlacement="auto"
               />
-            </div>
-            <div style={{ flex: '1 1 90px', minWidth: 70 }}>
+
+              {/* ── Alias ── */}
+              <div style={{ fontSize: 10, opacity: 0.7 }}>{t('metric.alias.label')}</div>
               <Input
                 value={mt.alias || ''}
                 onChange={(e) => updateMetric(mappingId, mi, { alias: e.currentTarget.value })}
-                placeholder="Alias"
+                placeholder={t('metric.alias.placeholder')}
                 style={{ fontSize: 11 }}
               />
-            </div>
-          </div>
-          {/* Text mode selector + custom template */}
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 120, flex: '0 1 140px' }}>
+
+              {/* ── SVG Text ── */}
+              <div style={{ fontSize: 10, opacity: 0.7 }}>{t('metric.svgText.short')}</div>
               <Select
                 options={TEXT_MODE_OPTIONS}
                 value={TEXT_MODE_OPTIONS.find((o) => o.value === (mt.textMode || 'off'))}
@@ -235,20 +212,158 @@ export const MetricAssignmentRow: React.FC<MetricAssignmentRowProps> = ({
                 placeholder="SVG Text"
                 menuPlacement="auto"
               />
-            </div>
-            {(mt.textMode === 'custom') && (
-              <Input
-                value={mt.textTemplate || ''}
-                onChange={(e) => updateMetric(mappingId, mi, { textTemplate: e.currentTarget.value })}
-                placeholder="{{value}} | {{alias}} | {{status:OK:NOK}}"
-                title={t('metric.templateTitle')}
-                style={{ fontSize: 11 }}
+              {(mt.textMode === 'custom') && (
+                <Input
+                  value={mt.textTemplate || ''}
+                  onChange={(e) => updateMetric(mappingId, mi, { textTemplate: e.currentTarget.value })}
+                  placeholder="{{value}} | {{alias}} | {{status:OK:NOK}}"
+                  title={t('metric.templateTitle')}
+                  style={{ fontSize: 11 }}
+                />
+              )}
+              {(mt.textMode === 'metric') && (
+                <span style={{ fontSize: 10, opacity: 0.5, fontStyle: 'italic' }}>{t('metric.showsValue')}</span>
+              )}
+            </>
+          ) : (
+            /* ─── METRIC TYPE (specific field): original full layout ─── */
+            <>
+              {/* ── Type badge ── */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1,
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 3,
+                  background: 'rgba(115,191,105,0.15)', color: '#73BF69',
+                }}>{t('metric.typeBadge.metric')}</span>
+              </div>
+              {/* Value field (X) */}
+              <Select
+                options={metricFieldOpts}
+                value={
+                  mt.field
+                    ? metricFieldOpts.find((o) => o.value === mt.field) || { label: mt.field, value: mt.field }
+                    : undefined
+                }
+                onChange={(v) => updateMetric(mappingId, mi, { field: v?.value || '' })}
+                allowCustomValue
+                isClearable
+                placeholder={t('metric.valueField')}
+                menuPlacement="auto"
               />
-            )}
-            {(mt.textMode === 'metric') && (
-              <span style={{ fontSize: 10, opacity: 0.5, fontStyle: 'italic' }}>{t('metric.showsValue')}</span>
-            )}
-          </div>
+              {/* Host field + filter pattern row (per-metric) */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 120px', minWidth: 100 }}>
+                  <Select
+                    options={metricFieldOpts}
+                    value={
+                      mt.hostField
+                        ? metricFieldOpts.find((o) => o.value === mt.hostField) || { label: mt.hostField, value: mt.hostField }
+                        : undefined
+                    }
+                    onChange={(v) => updateMetric(mappingId, mi, { hostField: v?.value || '' })}
+                    allowCustomValue
+                    isClearable
+                    placeholder={`Host field: ${defaultHostField}`}
+                    menuPlacement="auto"
+                  />
+                </div>
+                <div style={{ flex: '1 1 120px', minWidth: 100 }}>
+                  <Select
+                    options={filterPatternSuggestions}
+                    value={mt.filterPattern ? { label: mt.filterPattern, value: mt.filterPattern } : undefined}
+                    onChange={(v) => updateMetric(mappingId, mi, { filterPattern: v?.value || '' })}
+                    allowCustomValue
+                    isClearable
+                    placeholder="Pattern (ej: *BAMBOO*)"
+                    menuPlacement="auto"
+                  />
+                </div>
+              </div>
+              {/* Pattern match count indicator */}
+              {info && (() => {
+                const isOk = info.count > 0;
+                const maxShow = 5;
+                const matchList = info.matches.slice(0, maxShow).join(', ');
+                const more = info.count > maxShow ? ` (+${info.count - maxShow})` : '';
+                return (
+                  <div style={{
+                    fontSize: 10, padding: '2px 8px', marginTop: -1,
+                    color: isOk ? (isDark ? '#73BF69' : '#37872D') : (isDark ? '#FF7383' : '#C4162A'),
+                    lineHeight: 1.4,
+                  }}>
+                    {isOk
+                      ? `${info.count} match${info.count !== 1 ? 'es' : ''}: ${matchList}${more}`
+                      : t('metric.noMatches')
+                    }
+                  </div>
+                );
+              })()}
+              {/* Group by field (Y) */}
+              <Select
+                options={metricFieldOpts}
+                value={
+                  mt.groupByField
+                    ? metricFieldOpts.find((o) => o.value === mt.groupByField) || { label: mt.groupByField, value: mt.groupByField }
+                    : undefined
+                }
+                onChange={(v) => updateMetric(mappingId, mi, { groupByField: v?.value || '' })}
+                allowCustomValue
+                isClearable
+                placeholder={t('metric.groupBy')}
+                menuPlacement="auto"
+              />
+              {/* Data type (UnitPicker) */}
+              <UnitPicker
+                value={LEGACY_TO_GRAFANA_UNIT[mt.dataType || 'auto'] || mt.dataType || ''}
+                onChange={(unit) => updateMetric(mappingId, mi, { dataType: unit || 'auto' })}
+              />
+              {/* Aggregation + alias row */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 110px', minWidth: 90 }}>
+                  <Select
+                    options={AGGREGATION_OPTIONS}
+                    value={AGGREGATION_OPTIONS.find((o) => o.value === (mt.aggregation || 'last'))}
+                    onChange={(v) => updateMetric(mappingId, mi, { aggregation: (v?.value || 'last') as AggregationType })}
+                    placeholder="Aggregation"
+                    menuPlacement="auto"
+                  />
+                </div>
+                <div style={{ flex: '1 1 90px', minWidth: 70 }}>
+                  <Input
+                    value={mt.alias || ''}
+                    onChange={(e) => updateMetric(mappingId, mi, { alias: e.currentTarget.value })}
+                    placeholder="Alias"
+                    style={{ fontSize: 11 }}
+                  />
+                </div>
+              </div>
+              {/* Text mode selector + custom template */}
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 120, flex: '0 1 140px' }}>
+                  <Select
+                    options={TEXT_MODE_OPTIONS}
+                    value={TEXT_MODE_OPTIONS.find((o) => o.value === (mt.textMode || 'off'))}
+                    onChange={(v) => updateMetric(mappingId, mi, { textMode: (v?.value || 'off') as any })}
+                    placeholder="SVG Text"
+                    menuPlacement="auto"
+                  />
+                </div>
+                {(mt.textMode === 'custom') && (
+                  <Input
+                    value={mt.textTemplate || ''}
+                    onChange={(e) => updateMetric(mappingId, mi, { textTemplate: e.currentTarget.value })}
+                    placeholder="{{value}} | {{alias}} | {{status:OK:NOK}}"
+                    title={t('metric.templateTitle')}
+                    style={{ fontSize: 11 }}
+                  />
+                )}
+                {(mt.textMode === 'metric') && (
+                  <span style={{ fontSize: 10, opacity: 0.5, fontStyle: 'italic' }}>{t('metric.showsValue')}</span>
+                )}
+              </div>
+            </>
+          )}
         </div>
         <IconButton name="times" size="sm" tooltip={t('metric.remove')} onClick={() => removeMetric(mappingId, mi)} />
       </div>
