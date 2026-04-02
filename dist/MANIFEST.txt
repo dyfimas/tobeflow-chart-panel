@@ -25,11 +25,11 @@ Hash: SHA512
   ],
   "plugin": "tobeit-tobeflow-panel",
   "version": "1.3.0",
-  "time": 1775132487237,
+  "time": 1775133043593,
   "keyId": "7e4d0c6a708866e7",
   "files": {
     "plugin.json": "06793bb98adced4963476a0f7ba7923fdeba8a0c838c4528fc06a1e2edfa5b89",
-    "module.js": "88e374558845bdf56b0fdae477a89647b39173372ee3c3bb312fc2dbe0946c4b",
+    "module.js": "b4af987192cfdba70e371b55daa0a56ed9cfe14527e1b6dd98c673f8a1a743c3",
     "README.md": "bdc41a2fb08d9750f461bcf3c48a83d128538e729f9138b5a6c6498be257cb95",
     "CHANGELOG.md": "b5b07dea26d2be2800b45af35cb691379f02d69316a6fb54e81e54be7ec841a3",
     "LICENSE": "975f8b715667c84b3eb80e871224ff1e6bb028ea96a3f4843ca196456ca61f2f",
@@ -39,11 +39,11 @@ Hash: SHA512
 }
 -----BEGIN PGP SIGNATURE-----
 
-wsA+BAETCgBtBYJpzl9HCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
-aW9ucy5vcGVucGdwanMub3JnIvIac6QlRDJxFmTf3ptm330CsFbZeG09P3jz
-lAAaqqwWIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAADJUCCI4cdERcc8xZig9N
-8DITRU79b6NGOaL8a6BWskpGgXzA8pDaT9hxL13zeD/5/NGo4+newpr87xKT
-8o624/KLJdadAgkBDL5xviwc77dGdwNqM9wN9VPXWIw4bNEzo0/QYh0r3+34
-4fcSOMB8bDk4wI+Fgwqqox8muUvEyDiw+swIkoU6By4=
-=jFNv
+wsA/BAETCgBtBYJpzmFzCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
+aW9ucy5vcGVucGdwanMub3JnOuTH0yynbGygSAVFNqxqkhAZdG1pVPtifhf0
+w3mjP8wWIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAAhx8CCQGEHZK2iP+XM/Jo
+Ts468PJtJ5PTxCKyyr3VUMH8WHQ+XmQ7rWwHMSiMhaYXqqPXwESpz4nirsJP
+svqFNN2FRWTwuAIJAfkddwBgZncqlAfYHeKfNUh7PHT+zkqKSYih0+trk2Z4
+Q4TmTDH7fUhdt3+wqanPvjqd6yvXuDI7KY3lUnT9jrv5
+=vv88
 -----END PGP SIGNATURE-----

@@ -841,7 +841,7 @@ function attachCellListeners(
         .replace(/\{\{host\}\}/g, hd.normalizedHost)
         .replace(/\{\{cellId\}\}/g, cellId);
       url = replaceVariables(url);
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
