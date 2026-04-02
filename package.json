@@ -43,5 +43,12 @@
     "webpack": "^5.94.0",
     "webpack-cli": "^5.1.0",
     "webpack-livereload-plugin": "^3.0.0"
+  },
+  "overrides": {
+    "minimatch": "^9.0.5",
+    "picomatch": "^4.0.4",
+    "serialize-javascript": "^7.0.5",
+    "undici": "^7.24.7",
+    "immutable": "^5.1.5"
   }
 }

@@ -25,25 +25,26 @@ Hash: SHA512
   ],
   "plugin": "tobeit-tobeflow-panel",
   "version": "1.3.0",
-  "time": 1775133043593,
+  "time": 1775134459340,
   "keyId": "7e4d0c6a708866e7",
   "files": {
-    "plugin.json": "06793bb98adced4963476a0f7ba7923fdeba8a0c838c4528fc06a1e2edfa5b89",
-    "module.js": "b4af987192cfdba70e371b55daa0a56ed9cfe14527e1b6dd98c673f8a1a743c3",
-    "README.md": "bdc41a2fb08d9750f461bcf3c48a83d128538e729f9138b5a6c6498be257cb95",
+    "plugin.json": "c099fef8590757b6edef40177d83cb1ef3bd528ffc3103e00012be6d80fcd784",
+    "module.js": "c99f0f182e066a9a355f63bb561f208c6ded7cf2624affa0864595fb22d767fc",
+    "README.md": "b1894e81d566af9c2e7fabc8605b938ac4fe36b763f388107e5327c268675ba1",
     "CHANGELOG.md": "b5b07dea26d2be2800b45af35cb691379f02d69316a6fb54e81e54be7ec841a3",
     "LICENSE": "975f8b715667c84b3eb80e871224ff1e6bb028ea96a3f4843ca196456ca61f2f",
+    "module.js.map": "244bbe597d87bac6d9d664d8b49c4b133831b99f9fbd731cbf0ed380613110ae",
     "img/example-datacenter.svg": "4ea36172de1a19deb57cf7d0a4937a3fb9f517d1538c7f6bb84dc8d3e5839ddb",
     "img/logo.svg": "632f1484ca6f048ec61a3570d77eca5d6c2ef3ba8bfc2ef568eb24a7481c573c"
   }
 }
 -----BEGIN PGP SIGNATURE-----
 
-wsA/BAETCgBtBYJpzmFzCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
-aW9ucy5vcGVucGdwanMub3JnOuTH0yynbGygSAVFNqxqkhAZdG1pVPtifhf0
-w3mjP8wWIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAAhx8CCQGEHZK2iP+XM/Jo
-Ts468PJtJ5PTxCKyyr3VUMH8WHQ+XmQ7rWwHMSiMhaYXqqPXwESpz4nirsJP
-svqFNN2FRWTwuAIJAfkddwBgZncqlAfYHeKfNUh7PHT+zkqKSYih0+trk2Z4
-Q4TmTDH7fUhdt3+wqanPvjqd6yvXuDI7KY3lUnT9jrv5
-=vv88
+wsA+BAETCgBtBYJpzmb7CRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
+aW9ucy5vcGVucGdwanMub3Jn4mDymo9siSVmQZlNtfFqkhcnyo5vxSxU6lV1
+jx8SZY8WIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAAEwICCQEy93jUFbhU+R9P
+w9AHzpioKbTTR3Se/MmUwa8u9fMyFGRiMmmoQU57FCnXQRAuTGC2tNARxMdA
+MHc/YQRHO8dklgII3MDonw33oOc6FzGRp7C0tdbcF0SHIvUUL8GzSzzOlvVB
+fVXg/QDwXSPJHESLTjtLqYFp2aA1+fUtoWC9Gx9RyXU=
+=diDq
 -----END PGP SIGNATURE-----

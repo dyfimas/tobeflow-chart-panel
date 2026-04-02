@@ -19,15 +19,15 @@
     "links": [
       {
         "name": "repository",
-        "url": "https://github.com/dyfimas/tobeit-tobeflow-panel"
+        "url": "https://github.com/dyfimas/tobeflow-chart-panel"
       },
       {
         "name": "license",
-        "url": "https://github.com/dyfimas/tobeit-tobeflow-panel/blob/main/LICENSE"
+        "url": "https://github.com/dyfimas/tobeflow-chart-panel/blob/main/LICENSE"
       },
       {
         "name": "documentation",
-        "url": "https://github.com/dyfimas/tobeit-tobeflow-panel/blob/main/README.md"
+        "url": "https://github.com/dyfimas/tobeflow-chart-panel/blob/main/README.md"
       }
     ],
     "screenshots": [
