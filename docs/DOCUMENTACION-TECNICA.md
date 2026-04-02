@@ -1,7 +1,7 @@
 # ToBeFlow Chart Panel — Documentación Técnica
 
 **Versión:** 1.3.0  
-**Plugin ID:** `tobeflow-chart-panel`  
+**Plugin ID:** `tobeit-tobeflow-panel`  
 **Tipo:** Panel (frontend-only)  
 **Licencia:** Apache 2.0  
 **Autor:** ToBeIT ([tobeit.es](https://tobeit.es))
@@ -319,7 +319,7 @@ ToBeFlow no está firmado en el registro oficial de Grafana. Esto requiere:
 
 ```ini
 [plugins]
-allow_loading_unsigned_plugins = tobeflow-chart-panel
+allow_loading_unsigned_plugins = tobeit-tobeflow-panel
 ```
 
 Implicaciones:

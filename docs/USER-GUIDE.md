@@ -51,7 +51,7 @@ docker restart grafana-lab
 
 Variable de entorno necesaria:
 ```
-GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeflow-chart-panel
+GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeit-tobeflow-panel
 ```
 
 ---

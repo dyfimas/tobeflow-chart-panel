@@ -1,7 +1,7 @@
 # ToBeFlow Chart Panel — Manual de Instalación
 
 **Versión:** 1.3.0  
-**Plugin ID:** `tobeflow-chart-panel`  
+**Plugin ID:** `tobeit-tobeflow-panel`  
 **Compatibilidad:** Grafana ≥ 10.0.0
 
 ---
@@ -120,13 +120,13 @@ services:
       GF_SERVER_DOMAIN: grafana.ejemplo.com
       GF_SERVER_ROOT_URL: https://grafana.ejemplo.com/
       # ── Plugin sin firma ──
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "tobeflow-chart-panel"
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "tobeit-tobeflow-panel"
       # ── Modo producción ──
       GF_DEFAULT_APP_MODE: production
       GF_LOG_LEVEL: info
     volumes:
       # Plugin compilado (read-only en producción)
-      - ./plugins/svg-flow-panel/dist:/var/lib/grafana/plugins/tobeflow-chart-panel:ro
+      - ./plugins/svg-flow-panel/dist:/var/lib/grafana/plugins/tobeit-tobeflow-panel:ro
       # Datos persistentes
       - grafana-data:/var/lib/grafana
       # Provisioning (opcional)
@@ -173,13 +173,13 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "tobeflow-chart-panel"
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "tobeit-tobeflow-panel"
       GF_DEFAULT_APP_MODE: development
       GF_LOG_LEVEL: debug
       GF_FEATURE_TOGGLES_ENABLE: "publicDashboards"
     volumes:
       # Plugin en desarrollo (read-write para hot-reload)
-      - ./plugins/svg-flow-panel/dist:/var/lib/grafana/plugins/tobeflow-chart-panel
+      - ./plugins/svg-flow-panel/dist:/var/lib/grafana/plugins/tobeit-tobeflow-panel
       - grafana-dev-data:/var/lib/grafana
       - ./provisioning:/etc/grafana/provisioning
     healthcheck:
@@ -220,8 +220,8 @@ docker volume create grafana-data
 docker run -d \
   --name grafana \
   -p 3000:3000 \
-  -e GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeflow-chart-panel \
-  -v /ruta/a/dist:/var/lib/grafana/plugins/tobeflow-chart-panel:ro \
+  -e GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeit-tobeflow-panel \
+  -v /ruta/a/dist:/var/lib/grafana/plugins/tobeit-tobeflow-panel:ro \
   -v grafana-data:/var/lib/grafana \
   --restart unless-stopped \
   grafana/grafana:11.4.0
@@ -248,13 +248,13 @@ Puedes verificar la ruta en **Grafana** → **Administration** → **Settings** 
 
 ```bash
 # Copiar el directorio dist compilado
-sudo cp -r dist/ /var/lib/grafana/plugins/tobeflow-chart-panel
+sudo cp -r dist/ /var/lib/grafana/plugins/tobeit-tobeflow-panel
 
 # Asegurar permisos
-sudo chown -R grafana:grafana /var/lib/grafana/plugins/tobeflow-chart-panel
+sudo chown -R grafana:grafana /var/lib/grafana/plugins/tobeit-tobeflow-panel
 ```
 
-> **Importante:** El nombre del directorio debe ser `tobeflow-chart-panel` (el `id` del plugin).
+> **Importante:** El nombre del directorio debe ser `tobeit-tobeflow-panel` (el `id` del plugin).
 
 ### 4.3 Configurar Grafana para plugins sin firma
 
@@ -267,7 +267,7 @@ Añade o modifica:
 
 ```ini
 [plugins]
-allow_loading_unsigned_plugins = tobeflow-chart-panel
+allow_loading_unsigned_plugins = tobeit-tobeflow-panel
 ```
 
 ### 4.4 Reiniciar Grafana
@@ -299,12 +299,12 @@ image:
 
 grafana.ini:
   plugins:
-    allow_loading_unsigned_plugins: tobeflow-chart-panel
+    allow_loading_unsigned_plugins: tobeit-tobeflow-panel
 
 # Montar el plugin desde un PVC o ConfigMap
 extraVolumeMounts:
   - name: tobeflow-plugin
-    mountPath: /var/lib/grafana/plugins/tobeflow-chart-panel
+    mountPath: /var/lib/grafana/plugins/tobeit-tobeflow-panel
     readOnly: true
 
 extraVolumes:
@@ -342,7 +342,7 @@ image:
 
 grafana.ini:
   plugins:
-    allow_loading_unsigned_plugins: tobeflow-chart-panel
+    allow_loading_unsigned_plugins: tobeit-tobeflow-panel
 
 initContainers:
   - name: install-tobeflow-plugin
@@ -351,9 +351,9 @@ initContainers:
       - sh
       - -c
       - |
-        mkdir -p /var/lib/grafana/plugins/tobeflow-chart-panel
-        wget -qO- https://artifacts.ejemplo.com/tobeflow-chart-panel-1.3.0.tar.gz \
-          | tar xz -C /var/lib/grafana/plugins/tobeflow-chart-panel
+        mkdir -p /var/lib/grafana/plugins/tobeit-tobeflow-panel
+        wget -qO- https://artifacts.ejemplo.com/tobeit-tobeflow-panel-1.3.0.tar.gz \
+          | tar xz -C /var/lib/grafana/plugins/tobeit-tobeflow-panel
     volumeMounts:
       - name: grafana-plugins
         mountPath: /var/lib/grafana/plugins
@@ -377,10 +377,10 @@ Crea una imagen que incluya el plugin:
 FROM grafana/grafana:11.4.0
 
 # Copiar plugin compilado
-COPY dist/ /var/lib/grafana/plugins/tobeflow-chart-panel/
+COPY dist/ /var/lib/grafana/plugins/tobeit-tobeflow-panel/
 
 # Configurar plugins sin firma
-ENV GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeflow-chart-panel
+ENV GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeit-tobeflow-panel
 ```
 
 **Build y push:**
@@ -399,7 +399,7 @@ image:
 
 grafana.ini:
   plugins:
-    allow_loading_unsigned_plugins: tobeflow-chart-panel
+    allow_loading_unsigned_plugins: tobeit-tobeflow-panel
 ```
 
 ### 5.2 Sin Helm (manifiestos raw)
@@ -419,7 +419,7 @@ data:
     {
       "type": "panel",
       "name": "ToBeFlow Chart Panel",
-      "id": "tobeflow-chart-panel",
+      "id": "tobeit-tobeflow-panel",
       ...
     }
 ```
@@ -455,7 +455,7 @@ spec:
             - containerPort: 3000
           env:
             - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
-              value: "tobeflow-chart-panel"
+              value: "tobeit-tobeflow-panel"
           resources:
             limits:
               memory: 512Mi
@@ -467,7 +467,7 @@ spec:
             - name: grafana-data
               mountPath: /var/lib/grafana
             - name: tobeflow-plugin
-              mountPath: /var/lib/grafana/plugins/tobeflow-chart-panel
+              mountPath: /var/lib/grafana/plugins/tobeit-tobeflow-panel
               readOnly: true
           readinessProbe:
             httpGet:
@@ -516,12 +516,12 @@ spec:
 ### Verificar por API
 
 ```bash
-curl -s http://localhost:3000/api/plugins | grep -o '"id":"tobeflow-chart-panel"'
+curl -s http://localhost:3000/api/plugins | grep -o '"id":"tobeit-tobeflow-panel"'
 ```
 
 Debe devolver:
 ```
-"id":"tobeflow-chart-panel"
+"id":"tobeit-tobeflow-panel"
 ```
 
 ### Comprobar logs
@@ -539,7 +539,7 @@ journalctl -u grafana-server | grep -i tobeflow
 
 Deberías ver:
 ```
-logger=plugin.loader msg="Plugin registered" pluginID=tobeflow-chart-panel
+logger=plugin.loader msg="Plugin registered" pluginID=tobeit-tobeflow-panel
 ```
 
 ### Comprobar en un panel
@@ -578,9 +578,9 @@ docker compose restart grafana
 npm run build
 
 # Reemplazar
-sudo rm -rf /var/lib/grafana/plugins/tobeflow-chart-panel/*
-sudo cp -r dist/* /var/lib/grafana/plugins/tobeflow-chart-panel/
-sudo chown -R grafana:grafana /var/lib/grafana/plugins/tobeflow-chart-panel
+sudo rm -rf /var/lib/grafana/plugins/tobeit-tobeflow-panel/*
+sudo cp -r dist/* /var/lib/grafana/plugins/tobeit-tobeflow-panel/
+sudo chown -R grafana:grafana /var/lib/grafana/plugins/tobeit-tobeflow-panel
 
 # Reiniciar
 sudo systemctl restart grafana-server
@@ -609,9 +609,9 @@ helm upgrade grafana grafana/grafana -f values.yaml --set image.tag=11.4.0-1.4.0
 
 | Causa | Solución |
 |---|---|
-| Directorio mal nombrado | Debe ser `tobeflow-chart-panel` (el `id` del plugin.json) |
+| Directorio mal nombrado | Debe ser `tobeit-tobeflow-panel` (el `id` del plugin.json) |
 | Falta `plugin.json` | Verifica que `dist/plugin.json` existe dentro del directorio del plugin |
-| Falta config unsigned | Añadir `allow_loading_unsigned_plugins = tobeflow-chart-panel` |
+| Falta config unsigned | Añadir `allow_loading_unsigned_plugins = tobeit-tobeflow-panel` |
 | Grafana no reiniciado | Reiniciar Grafana tras copiar el plugin |
 | Permisos incorrectos | El usuario `grafana` (UID 472) debe poder leer los archivos |
 
@@ -625,13 +625,13 @@ logger=plugin.loader level=warn msg="Skipping loading plugin" ... error="plugin 
 
 ```ini
 [plugins]
-allow_loading_unsigned_plugins = tobeflow-chart-panel
+allow_loading_unsigned_plugins = tobeit-tobeflow-panel
 ```
 
 O variable de entorno:
 
 ```
-GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeflow-chart-panel
+GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeit-tobeflow-panel
 ```
 
 ### El panel aparece pero no se renderiza
@@ -646,14 +646,14 @@ GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=tobeflow-chart-panel
 
 1. Verificar que el volumen se monta **sin** `:ro`
 2. Verificar que `npm run dev` está ejecutándose
-3. Verificar que el contenedor ve los cambios: `docker exec grafana-dev ls /var/lib/grafana/plugins/tobeflow-chart-panel/`
+3. Verificar que el contenedor ve los cambios: `docker exec grafana-dev ls /var/lib/grafana/plugins/tobeit-tobeflow-panel/`
 4. En algunos entornos puede ser necesario reiniciar el contenedor tras cambios grandes
 
 ### Permisos en Kubernetes
 
 ```bash
 # Verificar que los archivos son legibles por el usuario grafana (UID 472)
-kubectl exec -n monitoring deploy/grafana -- ls -la /var/lib/grafana/plugins/tobeflow-chart-panel/
+kubectl exec -n monitoring deploy/grafana -- ls -la /var/lib/grafana/plugins/tobeit-tobeflow-panel/
 ```
 
 Si hay problemas de permisos, añade al pod:
