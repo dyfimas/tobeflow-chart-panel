@@ -253,7 +253,7 @@ svg-flow-panel/
   package.json
 ```
 
-> **Documentacion completa**: ver [docs/USER-GUIDE.md](https://github.com/dyfimas/tobeflow-chart-panel/blob/main/docs/USER-GUIDE.md)
+> **Documentacion completa**: ver [docs/USER-GUIDE.md](https://github.com/dyfimas/tobeflow-chart-panel/blob/master/docs/USER-GUIDE.md)
 
 ---
 
