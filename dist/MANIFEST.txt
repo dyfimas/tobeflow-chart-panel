@@ -25,26 +25,27 @@ Hash: SHA512
   ],
   "plugin": "tobeit-tobeflow-panel",
   "version": "1.3.0",
-  "time": 1775134922978,
+  "time": 1775136048381,
   "keyId": "7e4d0c6a708866e7",
   "files": {
     "plugin.json": "5cbb9f32551827399568099add960c9f59960085eac3ecfb996136b975b93b22",
     "module.js": "c99f0f182e066a9a355f63bb561f208c6ded7cf2624affa0864595fb22d767fc",
     "README.md": "4df5acc89373d6bc7c486b61bcf2aa53b5c723acdcb8f98e47c8518181f2418b",
+    "module.js.LICENSE.txt": "f109df7bf2546e32c4b87c143103de762d2c84c04ef0c7a41b7b8d07b4d2a6c1",
     "CHANGELOG.md": "b5b07dea26d2be2800b45af35cb691379f02d69316a6fb54e81e54be7ec841a3",
     "LICENSE": "975f8b715667c84b3eb80e871224ff1e6bb028ea96a3f4843ca196456ca61f2f",
-    "module.js.map": "244bbe597d87bac6d9d664d8b49c4b133831b99f9fbd731cbf0ed380613110ae",
+    "module.js.map": "2d2605ba9ed6357bdbd99332fec5fcd25362db7b6c502b182a836980743baa2e",
     "img/example-datacenter.svg": "4ea36172de1a19deb57cf7d0a4937a3fb9f517d1538c7f6bb84dc8d3e5839ddb",
     "img/logo.svg": "632f1484ca6f048ec61a3570d77eca5d6c2ef3ba8bfc2ef568eb24a7481c573c"
   }
 }
 -----BEGIN PGP SIGNATURE-----
 
-wsA/BAETCgBtBYJpzmjLCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
-aW9ucy5vcGVucGdwanMub3Jne1NmfFk001ZPcDBPj25DpQ6ogNl0OSNOisGm
-aoPhff8WIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAAn5gCCQEq9Z+kR2ahzgJu
-ruuo88U+HUHVas/oZ4YpkeointbBE0qCakv3+Zri6cz3NOiOPQ0IhK5iE0BK
-YEBqFlSb/QOxeQIJATCf8dFcgjqAaSrXMWBhsjWR419AGW5eUK6VntYEIFSv
-eLDh1JbkcO9W4CmqaLWIF97yurO3iQYA2jORaQ1rwtln
-=R9XF
+wsA/BAETCgBtBYJpzm0wCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
+aW9ucy5vcGVucGdwanMub3Jn6dc/7Su6poVnJ3dkQ8FHifLMpyrsKOLRBUHQ
+mUZNrDAWIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAAWk0CCQGUrGnLN8CipWNw
+hh0AS+7tHiAE9hxODYhzQydJ/SmhfgV67Yfx1W8TTKSJ1cEpzKpbd2jWhJxA
+/qxXhB1v6Pa2UQIJAeViMkA+184zrFxAaHGp/wggTVTvag3QvSxYPVPF/FlM
+jjEZ0tG3ojohlj1qE69bbOvmYmKx3CX0gcCjn9wjVSMi
+=eYPd
 -----END PGP SIGNATURE-----

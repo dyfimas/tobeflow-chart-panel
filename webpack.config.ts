@@ -33,6 +33,16 @@ const config = (env: Record<string, unknown>, argv: { mode?: string }): Configur
         type: 'amd',
       },
       clean: true,
+      // The Grafana plugin-validator resolves source map paths relative to <repo>/src/.
+      // Webpack defaults produce paths like webpack://<id>/./src/types.ts which becomes
+      // <repo>/src/src/types.ts (double src). Strip the src/ prefix so paths resolve correctly.
+      devtoolModuleFilenameTemplate: (info: { namespace: string; resourcePath: string }) => {
+        let rel = info.resourcePath; // e.g. "./src/types.ts"
+        if (rel.startsWith('./src/')) {
+          rel = './' + rel.slice(6); // → "./types.ts"
+        }
+        return `webpack://${info.namespace}/${rel}`;
+      },
     },
     externals: [
       // Function-based external to catch react/* sub-paths (jsx-runtime, jsx-dev-runtime)
