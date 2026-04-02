@@ -101,6 +101,26 @@ function extractCellIdsFromSvgText(src?: string): string[] {
   return Array.from(ids);
 }
 
+/** Longest common prefix of an array of strings */
+function longestCommonPrefix(strs: string[]): string {
+  if (strs.length === 0) return '';
+  let p = strs[0];
+  for (let i = 1; i < strs.length; i++) {
+    while (!strs[i].startsWith(p)) {
+      p = p.slice(0, -1);
+      if (!p) return '';
+    }
+  }
+  return p;
+}
+
+/** Template spec for a single metric query */
+interface QueryMetricSpec {
+  refId: string;
+  prefix: string;     // e.g. "CPU", "RAM", "DISK AVG", "SWAP", "Mount point"
+  isMulti: boolean;    // multi-group query (e.g. host + mount_point)
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }) => {
@@ -725,53 +745,154 @@ export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }
   );
 
   // ── Autodiscover ──
-  // P4: Use generic field names; actual field detection happens via metricsConfig
-  const AUTO_METRICS: MetricAssignment[] = [
-    { field: 'system.cpu.total.norm.pct', alias: 'CPU', dataType: 'percent', thresholds: [
-      { value: 80, color: '#FF9830', op: '>=' },
-      { value: 90, color: '#F2495C', op: '>=' },
-    ] },
-    { field: 'system.memory.actual.used.pct', alias: 'RAM', dataType: 'percent', thresholds: [
-      { value: 80, color: '#FF9830', op: '>=' },
-      { value: 90, color: '#F2495C', op: '>=' },
-    ] },
-    { field: 'system.filesystem.used.pct', alias: t('Disk Avg'), dataType: 'percent', thresholds: [
-      { value: 80, color: '#FF9830', op: '>=' },
-      { value: 90, color: '#F2495C', op: '>=' },
-    ] },
-    { field: 'system.filesystem.used.pct', alias: t('Disks'), dataType: 'percentunit', groupByField: 'system.filesystem.mount_point', thresholds: [
-      { value: 80, color: '#FF9830', op: '>=' },
-      { value: 90, color: '#F2495C', op: '>=' },
-    ] },
+  // Default templates for log-mode autodiscover (used when no user override).
+  const DEFAULT_AUTO_METRICS: MetricAssignment[] = [
+    { field: 'system.cpu.total.norm.pct', alias: 'CPU', dataType: 'percent'},
+    { field: 'system.memory.actual.used.pct', alias: 'RAM', dataType: 'percent'},
+    { field: 'system.filesystem.used.pct', alias: 'Disk Avg', dataType: 'percent'},
+    { field: 'system.filesystem.used.pct', alias: 'Disks', dataType: 'percentunit', groupByField: 'system.filesystem.mount_point'},
   ];
+
+  // Parse user-provided autodiscover templates from panel options (JSON array).
+  // Falls back to DEFAULT_AUTO_METRICS if empty, invalid, or not an array.
+  const AUTO_METRICS: MetricAssignment[] = useMemo(() => {
+    const raw = (context.options as Record<string, unknown>)?.autodiscoverTemplatesJson;
+    if (typeof raw !== 'string' || !raw.trim()) return DEFAULT_AUTO_METRICS;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_AUTO_METRICS;
+      return parsed.map((item: Record<string, unknown>) => ({
+        field: String(item.field ?? ''),
+        alias: String(item.alias ?? ''),
+        dataType: (item.dataType as MetricDataType) || 'auto',
+        ...(item.groupByField ? { groupByField: String(item.groupByField) } : {}),
+      }));
+    } catch {
+      return DEFAULT_AUTO_METRICS;
+    }
+  }, [(context.options as Record<string, unknown>)?.autodiscoverTemplatesJson]);
+
+  // ── Dynamic metric query analysis (for ES metric/aggregation queries) ──
+  // Extracts host names and alias prefixes from frame names by analysing the
+  // Longest Common Prefix per refId.  Works even when field labels are absent.
+  const { queryMetricSpecs, extractedHosts } = useMemo(() => {
+    const specs: QueryMetricSpec[] = [];
+    const hostSet = new Set<string>();
+
+    if (!context.data || refIdAnalyses.size === 0) {
+      return { queryMetricSpecs: specs, extractedHosts: hostSet };
+    }
+
+    for (const [refId, analysis] of refIdAnalyses) {
+      if (!analysis.isDynamic || analysis.frameNames.length < 2) continue;
+
+      const prefix = longestCommonPrefix(analysis.frameNames);
+      if (!prefix) continue;
+
+      const suffixes = analysis.frameNames.map((n) => n.substring(prefix.length));
+      if (suffixes.some((s) => !s.trim())) continue; // prefix covers full name → skip
+
+      // Detect multi-group: suffixes have a " - " (space-dash-space) separator
+      const sepRe = /^(.+?)\s+-\s+/;
+      const sepMatches = suffixes.map((s) => sepRe.exec(s));
+      const isMulti = sepMatches.every((m) => m !== null);
+
+      const cleanPrefix = prefix.replace(/[\s\-]+$/, '').trim();
+
+      if (isMulti) {
+        for (const m of sepMatches) {
+          if (m) {
+            const h = m[1].trim();
+            if (h) hostSet.add(h);
+          }
+        }
+      } else {
+        for (const s of suffixes) {
+          const h = s.trim();
+          if (h) hostSet.add(h);
+        }
+      }
+
+      specs.push({ refId, prefix: cleanPrefix, isMulti });
+    }
+
+    return { queryMetricSpecs: specs, extractedHosts: hostSet };
+  }, [context.data, refIdAnalyses]);
+
+  /** Build MetricAssignment[] for a given hostname using detected metric specs */
+  function buildMetricsForHost(host: string, specs: QueryMetricSpec[]): MetricAssignment[] {
+    return specs.map((s) => ({
+      field: '_value',
+      alias: s.isMulti ? '' : s.prefix,
+      filterPattern: s.isMulti ? `*${host} -*` : `${s.prefix} ${host}`,
+      refId: s.refId,
+      dataType: 'auto' as MetricDataType,
+      thresholds: [],
+    }));
+  }
 
   const autodiscover = useCallback(
     (mappingId: string) => {
       onChange(
         mappings.map((m) => {
           if (m.id !== mappingId) return m;
+
+          // Dynamic metric mode: specs detected from data frame names
+          if (queryMetricSpecs.length > 0) {
+            const hostname = m.hostName || m.cellId || '';
+            if (!hostname) return m;
+            // Resolve against known data hosts
+            const hostNorm = normHost(hostname);
+            const resolvedHost = Array.from(extractedHosts).find((h) => normHost(h) === hostNorm) || hostname.toLowerCase();
+            const existingRefIds = new Set(m.metrics.map((mt) => mt.refId).filter(Boolean));
+            const toAdd = buildMetricsForHost(resolvedHost, queryMetricSpecs).filter(
+              (mt) => !existingRefIds.has(mt.refId!)
+            );
+            return toAdd.length > 0 ? { ...m, metrics: [...m.metrics, ...toAdd] } : m;
+          }
+
+          // Legacy log mode: static field-based templates
           const existing = new Set(m.metrics.map((mt) => mt.field));
           const toAdd = AUTO_METRICS.filter((am) => !existing.has(am.field));
           return toAdd.length > 0 ? { ...m, metrics: [...m.metrics, ...toAdd] } : m;
         })
       );
     },
-    [mappings, onChange]
+    [mappings, onChange, queryMetricSpecs, extractedHosts, AUTO_METRICS]
   );
 
   const autodiscoverAll = useCallback(() => {
     onChange(
       mappings.map((m) => {
+        // Dynamic metric mode
+        if (queryMetricSpecs.length > 0) {
+          const hostname = m.hostName || m.cellId || '';
+          if (!hostname) return m;
+          const hostNorm = normHost(hostname);
+          const resolvedHost = Array.from(extractedHosts).find((h) => normHost(h) === hostNorm) || hostname.toLowerCase();
+          const existingRefIds = new Set(m.metrics.map((mt) => mt.refId).filter(Boolean));
+          const toAdd = buildMetricsForHost(resolvedHost, queryMetricSpecs).filter(
+            (mt) => !existingRefIds.has(mt.refId!)
+          );
+          return toAdd.length > 0 ? { ...m, metrics: [...m.metrics, ...toAdd] } : m;
+        }
+
+        // Legacy log mode
         const existing = new Set(m.metrics.map((mt) => mt.field));
         const toAdd = AUTO_METRICS.filter((am) => !existing.has(am.field));
         return toAdd.length > 0 ? { ...m, metrics: [...m.metrics, ...toAdd] } : m;
       })
     );
-  }, [mappings, onChange]);
+  }, [mappings, onChange, queryMetricSpecs, extractedHosts, AUTO_METRICS]);
 
   const autoFillMappings = useCallback(() => {
     const cellIds = cellIdOptions.map((o) => o.value).filter((v): v is string => !!v);
-    const hosts = hostOptions.map((o) => o.value).filter((v): v is string => !!v);
+    // For metric queries, use hosts extracted from frame names (more reliable)
+    // Fall back to hostOptions for log queries
+    const useMetricMode = queryMetricSpecs.length > 0 && extractedHosts.size > 0;
+    const hosts = useMetricMode
+      ? Array.from(extractedHosts)
+      : hostOptions.map((o) => o.value).filter((v): v is string => !!v);
 
     if (cellIds.length === 0) {
       setAutoFillSummary(t('autofill.noCellIds'));
@@ -811,11 +932,23 @@ export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }
         label: '',
       };
 
+      const existingRefIds = new Set(base.metrics.map((mt) => mt.refId).filter(Boolean));
       const existingFields = new Set(base.metrics.map((mt) => mt.field));
       const metrics = [...base.metrics];
-      for (const tpl of AUTO_METRICS) {
-        if (!existingFields.has(tpl.field)) {
-          metrics.push(cloneMetricTemplate(tpl));
+
+      if (useMetricMode) {
+        // Dynamic metric mode: filterPattern-based templates
+        for (const mt of buildMetricsForHost(matchedHost, queryMetricSpecs)) {
+          if (!existingRefIds.has(mt.refId!)) {
+            metrics.push(mt);
+          }
+        }
+      } else {
+        // Legacy log mode: static field-based templates
+        for (const tpl of AUTO_METRICS) {
+          if (!existingFields.has(tpl.field)) {
+            metrics.push(cloneMetricTemplate(tpl));
+          }
         }
       }
 
@@ -842,7 +975,7 @@ export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }
     setAutoFillSummary(
       t('autofill.summary', { linked: String(linked), total: String(cellIds.length), created: String(created), updated: String(updated), skipped: String(skipped) })
     );
-  }, [cellIdOptions, hostOptions, mappings, onChange]);
+  }, [cellIdOptions, hostOptions, mappings, onChange, queryMetricSpecs, extractedHosts, AUTO_METRICS]);
 
   // ── Auto-suggest for query ──
   const autoSuggestForQuery = useCallback(
@@ -1049,6 +1182,7 @@ export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }
       if (opts.hostMappingJson) envelope.hostMappingJson = opts.hostMappingJson;
       if (opts.customThresholdsJson) envelope.customThresholdsJson = opts.customThresholdsJson;
       if (opts.metricsConfigJson) envelope.metricsConfigJson = opts.metricsConfigJson;
+      if (opts.autodiscoverTemplatesJson) envelope.autodiscoverTemplatesJson = opts.autodiscoverTemplatesJson;
       if (opts.globalThresholds) envelope.globalThresholds = opts.globalThresholds;
       if (opts.tooltipConfig) envelope.tooltipConfig = opts.tooltipConfig;
     }
@@ -1092,6 +1226,7 @@ export const CellMappingsEditor: React.FC<Props> = ({ value, onChange, context }
               'svgSource', 'svgUrl', 'layers', 'debugMode',
               'hostField', 'clickUrlTemplate',
               'hostMappingJson', 'customThresholdsJson', 'metricsConfigJson',
+              'autodiscoverTemplatesJson',
             ]) {
               if (parsed[key]) extras.push(key);
             }

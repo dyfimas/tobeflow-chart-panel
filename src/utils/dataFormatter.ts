@@ -154,7 +154,12 @@ export function colorToSeverity(hexColor: string): { severity: Severity; order: 
  * Resuelve el color de un valor numérico según umbrales personalizados.
  * Los thresholds se evalúan en orden (prioridad del usuario); se usa el primero que match.
  * Devuelve null si no hay thresholds configurados.
+ *
+ * B4: Pre-sorted thresholds are cached by array reference to avoid
+ * re-sorting on every call within the same render cycle.
  */
+const _sortedThresholdsCache = new WeakMap<MetricThreshold[], MetricThreshold[]>();
+
 export function resolveThresholdColor(
   displayValue: number | string,
   thresholds?: MetricThreshold[],
@@ -173,12 +178,20 @@ export function resolveThresholdColor(
       }))
     : thresholds;
 
-  // Sort thresholds by value descending so the highest (most severe) is checked first.
-  // This matches Grafana's native threshold behaviour for >= / > operators.
+  // B4: Cache sorted array by reference so repeated calls don't re-sort
   const allGte = resolvedThresholds.every(th => { const o = th.op || '>='; return o === '>=' || o === '>'; });
-  const sorted = allGte
-    ? [...resolvedThresholds].sort((a, b) => b.value - a.value)
-    : resolvedThresholds;
+  let sorted: MetricThreshold[];
+  if (allGte) {
+    const cached = _sortedThresholdsCache.get(resolvedThresholds);
+    if (cached) {
+      sorted = cached;
+    } else {
+      sorted = [...resolvedThresholds].sort((a, b) => b.value - a.value);
+      _sortedThresholdsCache.set(resolvedThresholds, sorted);
+    }
+  } else {
+    sorted = resolvedThresholds;
+  }
 
   for (const th of sorted) {
     const op = th.op || '>=';
@@ -199,7 +212,12 @@ export function resolveThresholdColor(
 /**
  * Aplica value mappings a un valor.
  * Soporta tipos: value, range, comparison, regex.
+ *
+ * P-B: Regex patterns are compiled once and cached per ValueMapping
+ * object reference to avoid repeated RegExp construction.
  */
+const _vmRegexCache = new WeakMap<ValueMapping, RegExp | null>();
+
 export function applyValueMapping(
   val: number | string,
   unit: string,
@@ -239,12 +257,19 @@ export function applyValueMapping(
           }
         }
       } else if (vmType === 'regex') {
-        try {
-          const re = new RegExp(vm.pattern || vm.value || '', 'i');
-          if (re.test(strVal)) {
-            return { value: vm.text, unit: '', isPercentage: false, color: vm.color || undefined };
+        // P-B: Use cached compiled regex
+        let re = _vmRegexCache.get(vm);
+        if (re === undefined) {
+          try {
+            re = new RegExp(vm.pattern || vm.value || '', 'i');
+          } catch {
+            re = null;
           }
-        } catch { /* invalid regex, skip */ }
+          _vmRegexCache.set(vm, re);
+        }
+        if (re && re.test(strVal)) {
+          return { value: vm.text, unit: '', isPercentage: false, color: vm.color || undefined };
+        }
       }
     }
   }

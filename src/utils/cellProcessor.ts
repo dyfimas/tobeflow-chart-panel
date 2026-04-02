@@ -13,12 +13,12 @@ import {
   COLORES,
 } from '../types';
 import type { TooltipEntry } from './tooltipManager';
-import { findHostInMetrics, findMetricInHost, findRawFieldValue, findLastTimestamp } from './hostResolver';
+import { findMetricInHost, findRawFieldValue, findLastTimestamp } from './hostResolver';
 import { collectAllFieldValues, findGroupedFieldValues } from './aggregation';
 import { aggregateValues } from './aggregation';
 import { applyDataType, colorToSeverity, resolveThresholdColor, applyValueMapping, escapeRegex } from './dataFormatter';
 import { combineHosts } from './metricExtractor';
-import { findHostFast, queryFieldIndex } from './metricsIndex';
+import { findHostFast, queryFieldIndex, buildHostSearchIndex } from './metricsIndex';
 import type { HostSearchIndex, FieldValueIndex } from './metricsIndex';
 
 // ─── Tipos internos ────────────────────────────────────────
@@ -61,11 +61,10 @@ export function resolveHostForCell(
     if (rawHostName.includes(',')) {
       const hostNames = rawHostName.split(',').map(h => h.trim()).filter(Boolean);
       const foundHosts: HostMetrics[] = [];
+      // B2: Always use O(1) fast index; build ad-hoc if not provided
+      const idx = hostIndex || buildHostSearchIndex(effectiveMetrics);
       for (const hn of hostNames) {
-        // P14: Use fast index when available, fallback to linear scan
-        const hd = hostIndex
-          ? findHostFast(effectiveMetrics, hostIndex, hn)
-          : findHostInMetrics(effectiveMetrics, hn);
+        const hd = findHostFast(effectiveMetrics, idx, hn);
         if (hd) foundHosts.push(hd);
       }
       if (foundHosts.length > 1) {
@@ -76,10 +75,9 @@ export function resolveHostForCell(
       return { resolvedHost: rawHostName, hostData: null };
     }
 
-    // P14: Use fast index when available
-    const hd = hostIndex
-      ? findHostFast(effectiveMetrics, hostIndex, rawHostName)
-      : findHostInMetrics(effectiveMetrics, rawHostName);
+    // B2: Always use O(1) fast index; build ad-hoc if not provided
+    const idx2 = hostIndex || buildHostSearchIndex(effectiveMetrics);
+    const hd = findHostFast(effectiveMetrics, idx2, rawHostName);
     return { resolvedHost: rawHostName, hostData: hd };
   }
 
@@ -121,7 +119,10 @@ export function resolveMetricEntries(
 
   for (const metric of cellMapping.metrics || []) {
     const { alias, dataType, thresholds, valueMappings,
-      aggregation, refId: metricRefId } = metric;
+      aggregation, refId: metricRefId, skipThresholdColor: metricSkipColor, skipCellSeverity: metricSkipSev } = metric;
+    // Mapping-level flags cascade to metrics (metric can also override individually)
+    const skipThresholdColor = metricSkipColor || cellMapping.skipThresholdColor;
+    const skipCellSeverity = metricSkipSev || cellMapping.skipCellSeverity;
     // P2: Resolve Grafana dashboard variables in metric fields
     const field = metric.field ? ctx.replaceVariables(metric.field) : metric.field;
     const filterPattern = metric.filterPattern ? ctx.replaceVariables(metric.filterPattern) : metric.filterPattern;
@@ -133,6 +134,7 @@ export function resolveMetricEntries(
 
     // Per-metric host resolution
     let metricHostData: HostMetrics | null = null;
+    let filterMatches: HostMetrics[] = [];
     let metricEffectiveMetrics = ctx.effectiveMetrics;
     let metricHostFieldName = ctx.defaultHostFieldName;
     let metricSeries = ctx.effectiveSeries;
@@ -152,18 +154,19 @@ export function resolveMetricEntries(
         const re = new RegExp(regexStr, 'i');
         for (const [, hostEntry] of metricEffectiveMetrics) {
           if (re.test(hostEntry.hostname)) {
-            metricHostData = hostEntry;
-            break;
+            filterMatches.push(hostEntry);
           }
+        }
+        if (filterMatches.length > 0) {
+          metricHostData = filterMatches[0];
         }
       } catch { /* invalid pattern */ }
     } else if (metricHostField && hostData) {
       const rawHostName = cellMapping.hostName ? ctx.replaceVariables(cellMapping.hostName) : '';
       if (rawHostName) {
-        // P14: Use fast index when available
-        metricHostData = ctx.hostSearchIndex
-          ? findHostFast(metricEffectiveMetrics, ctx.hostSearchIndex, rawHostName)
-          : findHostInMetrics(metricEffectiveMetrics, rawHostName);
+        // B2: Always use O(1) fast index; build ad-hoc if not provided
+        const mIdx = ctx.hostSearchIndex || buildHostSearchIndex(metricEffectiveMetrics);
+        metricHostData = findHostFast(metricEffectiveMetrics, mIdx, rawHostName);
       }
       if (!metricHostData) {
         for (const [hostKey, hostEntry] of metricEffectiveMetrics) {
@@ -182,6 +185,53 @@ export function resolveMetricEntries(
       continue;
     }
 
+    // Multi-match filterPattern: create an entry per matched host
+    if (filterMatches.length > 1) {
+      for (const matchedHost of filterMatches) {
+        const mTs = findLastTimestamp(metricSeries, matchedHost.hostname, metricHostFieldName);
+        if (mTs !== null && (latestMetricTs === null || mTs > latestMetricTs)) {
+          latestMetricTs = mTs;
+        }
+        let rawVal: number | string | null = null;
+        if (agg === 'timeOfLastPoint') {
+          rawVal = findLastTimestamp(metricSeries, matchedHost.hostname, metricHostFieldName);
+        } else if (agg !== 'last' && agg !== 'lastNotNull') {
+          let allValues: number[];
+          if (ctx.fieldValueIndex) {
+            allValues = queryFieldIndex(ctx.fieldValueIndex, matchedHost.hostname, field);
+            if (allValues.length === 0) {
+              allValues = collectAllFieldValues(metricSeries, matchedHost.hostname, field, metricHostFieldName);
+            }
+          } else {
+            allValues = collectAllFieldValues(metricSeries, matchedHost.hostname, field, metricHostFieldName);
+          }
+          rawVal = aggregateValues(allValues, agg);
+        } else {
+          const mv = findMetricInHost(matchedHost, field, effectiveMetricRefId || undefined);
+          if (mv) {
+            rawVal = mv.value;
+          } else {
+            rawVal = findRawFieldValue(metricSeries, matchedHost.hostname, field, metricHostFieldName);
+          }
+        }
+        if (rawVal !== null) {
+          const fmt = applyDataType(rawVal, dt);
+          const effectiveThresholds = (thresholds && thresholds.length > 0) ? thresholds : ctx.globalThresholds;
+          const thColor = resolveThresholdColor(fmt.value, effectiveThresholds);
+          const mapped = applyValueMapping(fmt.value, fmt.unit, fmt.isPercentage, valueMappings);
+          const history = collectMetricHistory(metricSeries, matchedHost.hostname, field, metricHostFieldName, dt);
+          const entryColor = skipThresholdColor ? COLORES.NORMAL : (mapped.color || thColor || COLORES.NORMAL);
+          entries.push({
+            label: matchedHost.hostname,
+            value: mapped.value, unit: mapped.unit,
+            color: entryColor, isPercentage: mapped.isPercentage, history,
+            skipCellSeverity,
+          });
+        }
+      }
+      continue;
+    }
+
     // Grouped metric
     if (groupByField && groupByField !== field) {
       const grouped = findGroupedFieldValues(metricSeries, metricHostData.hostname, field, groupByField, metricHostFieldName);
@@ -190,12 +240,13 @@ export function resolveMetricEntries(
           const fmt = applyDataType(rawVal, dt);
           const effectiveThresholds = (thresholds && thresholds.length > 0) ? thresholds : ctx.globalThresholds;
           const thColor = resolveThresholdColor(fmt.value, effectiveThresholds);
-          const entryColor = thColor || COLORES.NORMAL;
+          const entryColor = skipThresholdColor ? COLORES.NORMAL : (thColor || COLORES.NORMAL);
           const mapped = applyValueMapping(fmt.value, fmt.unit, fmt.isPercentage, valueMappings);
           entries.push({
             label: alias ? `${alias} ${group}` : `${group}`,
             value: mapped.value, unit: mapped.unit,
-            color: mapped.color || entryColor, isPercentage: mapped.isPercentage,
+            color: skipThresholdColor ? entryColor : (mapped.color || entryColor), isPercentage: mapped.isPercentage,
+            skipCellSeverity,
           });
         }
       } else {
@@ -244,9 +295,12 @@ export function resolveMetricEntries(
       const effectiveThresholds = (thresholds && thresholds.length > 0) ? thresholds : ctx.globalThresholds;
       const thColor = resolveThresholdColor(fmt.value, effectiveThresholds);
       const mapped = applyValueMapping(fmt.value, fmt.unit, fmt.isPercentage, valueMappings);
+      const history = collectMetricHistory(metricSeries, metricHostData.hostname, field, metricHostFieldName, dt);
+      const entryColor = skipThresholdColor ? COLORES.NORMAL : (mapped.color || thColor || COLORES.NORMAL);
       entries.push({
         label: resolvedLabel, value: mapped.value, unit: mapped.unit,
-        color: mapped.color || thColor || COLORES.NORMAL, isPercentage: mapped.isPercentage,
+        color: entryColor, isPercentage: mapped.isPercentage, history,
+        skipCellSeverity,
       });
     } else {
       const effectiveThresholds2 = (thresholds && thresholds.length > 0) ? thresholds : ctx.globalThresholds;
@@ -255,6 +309,7 @@ export function resolveMetricEntries(
       entries.push({
         label: alias || field, value: mapped.value, unit: mapped.unit,
         color: mapped.color || thColor || COLORES.SIN_DATOS, isPercentage: mapped.isPercentage,
+        skipCellSeverity,
       });
     }
   }
@@ -262,6 +317,7 @@ export function resolveMetricEntries(
   // Worst severity across all entries
   let worstSevOrd = 0;
   for (const entry of entries) {
+    if (entry.skipCellSeverity) continue;
     const { severity: entrySev, order: entryOrd } = colorToSeverity(entry.color);
     if (entryOrd > worstSevOrd) {
       worstSevOrd = entryOrd;
@@ -276,6 +332,62 @@ export function resolveMetricEntries(
     color: worstColor || COLORES.NORMAL,
     latestMetricTs,
   };
+}
+
+function collectMetricHistory(
+  series: DataFrame[],
+  hostname: string,
+  fieldName: string,
+  hostFieldName: string,
+  dataType: MetricDataType
+): Array<{ ts: number; value: number }> {
+  const points: Array<{ ts: number; value: number }> = [];
+  const hostNorm = hostname.toLowerCase();
+
+  for (const frame of series) {
+    const targetField = frame.fields.find((f) => f.name === fieldName);
+    const timeField = frame.fields.find((f) => f.type === 'time' || f.name === '@timestamp');
+    if (!targetField || !timeField) {
+      continue;
+    }
+
+    const hostField = frame.fields.find(
+      (f) => f.name === hostFieldName || f.name === 'host.name' || f.name === 'host' || f.name === 'hostname'
+    );
+
+    for (let i = 0; i < targetField.values.length; i++) {
+      if (hostField) {
+        const rowHost = String(hostField.values[i] ?? '').toLowerCase();
+        if (!rowHost || (!rowHost.includes(hostNorm) && !hostNorm.includes(rowHost))) {
+          continue;
+        }
+      }
+
+      const tsRaw = timeField.values[i];
+      const valRaw = targetField.values[i];
+      const ts = typeof tsRaw === 'number' ? tsRaw : Number(tsRaw);
+      const valNum = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw));
+      if (!Number.isFinite(ts) || !Number.isFinite(valNum)) {
+        continue;
+      }
+
+      const fmt = applyDataType(valNum, dataType);
+      const displayNum = typeof fmt.value === 'number' ? fmt.value : parseFloat(String(fmt.value));
+      points.push({ ts, value: Number.isFinite(displayNum) ? displayNum : valNum });
+    }
+  }
+
+  points.sort((a, b) => a.ts - b.ts);
+  if (points.length <= 1) {
+    return [];
+  }
+
+  const dedup = new Map<number, number>();
+  for (const p of points) {
+    dedup.set(p.ts, p.value);
+  }
+
+  return Array.from(dedup.entries()).map(([ts, value]) => ({ ts, value }));
 }
 
 // ─── Text template replacement ──────────────────────────────
@@ -366,6 +478,7 @@ export function resolveTextTemplates(
 
     txt = txt.replace(/\{\{alias\}\}/gi, met.alias || met.field || '');
     txt = txt.replace(/\{\{field\}\}/gi, met.field || '');
+    txt = txt.replace(/\{\{pattern\}\}/gi, met.filterPattern || '');
 
     if (mappedTooltip) {
       for (const entry of mappedTooltip) {

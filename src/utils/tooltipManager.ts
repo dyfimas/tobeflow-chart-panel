@@ -4,6 +4,7 @@
 // Configurable via TooltipConfig
 // ─────────────────────────────────────────────────────────────
 import { HostMetrics, Severity, SEVERITY_COLORS, COLORES, DEFAULT_METRICAS_CONFIG, MetricConfig, TooltipConfig, METRIC_DISPLAY_ORDER } from '../types';
+import DOMPurify from 'dompurify';
 
 const TOOLTIP_ID_PREFIX = 'svgflow-tooltip';
 let tooltipIdCounter = 0;
@@ -32,20 +33,81 @@ const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
   borderRadius: 4,
   padding: 12,
   opacity: 0.95,
+  backdropBlur: 14,
+  shadowColor: 'rgba(0, 0, 0, 0.5)',
+  shadowBlur: 32,
+  headerBackgroundColor: 'transparent',
   showSeverity: true,
   showTimestamp: true,
+  showMiniCharts: true,
+  miniChartHeight: 26,
+  miniChartPoints: 40,
+  pinKey: 'alt',
+  customCss: '',
+  htmlTemplate: '',
 };
+
+function toPinKey(value: unknown): 'alt' | 'shift' | 'ctrl' | 'meta' {
+  if (value === 'shift' || value === 'ctrl' || value === 'meta') {
+    return value;
+  }
+  return 'alt';
+}
+
+/** Format a timestamp as clock + relative "hace X min" / "X min ago" */
+function formatTimestamp(ts?: number | null): string {
+  const locale = navigator.language || 'es-ES';
+  const isEs = locale.startsWith('es');
+  if (ts && Number.isFinite(ts)) {
+    const clock = new Date(ts).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const diffMs = Date.now() - ts;
+    if (diffMs < 0 || diffMs > 86_400_000) return clock;
+    if (diffMs < 60_000) return `${clock} <span style="opacity:0.6">(${isEs ? 'ahora' : 'now'})</span>`;
+    const mins = Math.floor(diffMs / 60_000);
+    if (mins < 60) return `${clock} <span style="opacity:0.6">(${isEs ? `hace ${mins} min` : `${mins} min ago`})</span>`;
+    const hrs = Math.floor(mins / 60);
+    return `${clock} <span style="opacity:0.6">(${isEs ? `hace ${hrs}h ${mins % 60}m` : `${hrs}h ${mins % 60}m ago`})</span>`;
+  }
+  return new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
 
 /** Merge partial user config with defaults */
 function resolveConfig(cfg?: Partial<TooltipConfig>): TooltipConfig {
   if (!cfg) return DEFAULT_TOOLTIP_CONFIG;
-  return { ...DEFAULT_TOOLTIP_CONFIG, ...cfg };
+  const merged = { ...DEFAULT_TOOLTIP_CONFIG, ...cfg } as any;
+  return {
+    ...DEFAULT_TOOLTIP_CONFIG,
+    ...merged,
+    mode: merged.mode === 'compact' || merged.mode === 'off' ? merged.mode : 'detailed',
+    maxWidth: Number.isFinite(merged.maxWidth) ? merged.maxWidth : DEFAULT_TOOLTIP_CONFIG.maxWidth,
+    fontSize: Number.isFinite(merged.fontSize) ? merged.fontSize : DEFAULT_TOOLTIP_CONFIG.fontSize,
+    fontFamily: typeof merged.fontFamily === 'string' && merged.fontFamily.trim() ? merged.fontFamily : DEFAULT_TOOLTIP_CONFIG.fontFamily,
+    backgroundColor: typeof merged.backgroundColor === 'string' ? merged.backgroundColor : DEFAULT_TOOLTIP_CONFIG.backgroundColor,
+    textColor: typeof merged.textColor === 'string' ? merged.textColor : DEFAULT_TOOLTIP_CONFIG.textColor,
+    borderColor: typeof merged.borderColor === 'string' ? merged.borderColor : DEFAULT_TOOLTIP_CONFIG.borderColor,
+    borderRadius: Number.isFinite(merged.borderRadius) ? merged.borderRadius : DEFAULT_TOOLTIP_CONFIG.borderRadius,
+    padding: Number.isFinite(merged.padding) ? merged.padding : DEFAULT_TOOLTIP_CONFIG.padding,
+    opacity: Number.isFinite(merged.opacity) ? merged.opacity : DEFAULT_TOOLTIP_CONFIG.opacity,
+    backdropBlur: Number.isFinite(merged.backdropBlur) ? merged.backdropBlur : DEFAULT_TOOLTIP_CONFIG.backdropBlur,
+    shadowColor: typeof merged.shadowColor === 'string' ? merged.shadowColor : DEFAULT_TOOLTIP_CONFIG.shadowColor,
+    shadowBlur: Number.isFinite(merged.shadowBlur) ? merged.shadowBlur : DEFAULT_TOOLTIP_CONFIG.shadowBlur,
+    headerBackgroundColor: typeof merged.headerBackgroundColor === 'string' ? merged.headerBackgroundColor : DEFAULT_TOOLTIP_CONFIG.headerBackgroundColor,
+    showSeverity: typeof merged.showSeverity === 'boolean' ? merged.showSeverity : DEFAULT_TOOLTIP_CONFIG.showSeverity,
+    showTimestamp: typeof merged.showTimestamp === 'boolean' ? merged.showTimestamp : DEFAULT_TOOLTIP_CONFIG.showTimestamp,
+    showMiniCharts: typeof merged.showMiniCharts === 'boolean' ? merged.showMiniCharts : DEFAULT_TOOLTIP_CONFIG.showMiniCharts,
+    miniChartHeight: Number.isFinite(merged.miniChartHeight) ? merged.miniChartHeight : DEFAULT_TOOLTIP_CONFIG.miniChartHeight,
+    miniChartPoints: Number.isFinite(merged.miniChartPoints) ? merged.miniChartPoints : DEFAULT_TOOLTIP_CONFIG.miniChartPoints,
+    pinKey: toPinKey(merged.pinKey),
+    customCss: typeof merged.customCss === 'string' ? merged.customCss : DEFAULT_TOOLTIP_CONFIG.customCss,
+    htmlTemplate: typeof merged.htmlTemplate === 'string' ? merged.htmlTemplate : DEFAULT_TOOLTIP_CONFIG.htmlTemplate,
+  };
 }
 
 function buildTooltipStyles(cfg: TooltipConfig, tooltipId: string): string {
   const fontFamily = cfg.fontFamily === 'inherit' 
     ? "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     : cfg.fontFamily;
+  const scopedCustomCss = scopeTooltipCss(cfg.customCss, tooltipId);
   
   return `
   #${tooltipId} {
@@ -60,10 +122,10 @@ function buildTooltipStyles(cfg: TooltipConfig, tooltipId: string): string {
     padding: ${cfg.padding}px;
     border-radius: ${cfg.borderRadius}px;
     background: ${cfg.backgroundColor};
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(${cfg.backdropBlur}px);
+    -webkit-backdrop-filter: blur(${cfg.backdropBlur}px);
     border: 1px solid ${cfg.borderColor};
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px ${cfg.shadowBlur}px ${cfg.shadowColor};
     font-family: ${fontFamily};
     font-size: ${cfg.fontSize}px;
     color: ${cfg.textColor};
@@ -80,6 +142,7 @@ function buildTooltipStyles(cfg: TooltipConfig, tooltipId: string): string {
     margin-bottom: 8px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
     padding-bottom: 8px;
+    background: ${cfg.headerBackgroundColor};
   }
   #${tooltipId} .tt-dot {
     width: 10px;
@@ -130,6 +193,23 @@ function buildTooltipStyles(cfg: TooltipConfig, tooltipId: string): string {
     font-variant-numeric: tabular-nums;
     font-size: ${cfg.fontSize}px;
   }
+  #${tooltipId} .tt-sparkline-wrap {
+    grid-column: 1 / -1;
+    margin: 1px 0 2px;
+  }
+  #${tooltipId} .tt-sparkline {
+    width: 100%;
+    display: block;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.04);
+  }
+  #${tooltipId} .tt-chart-hover-time {
+    margin-top: 6px;
+    min-height: 14px;
+    font-size: ${Math.max(9, cfg.fontSize - 2)}px;
+    color: #9ca3af;
+    text-align: right;
+  }
   #${tooltipId} .tt-bar-container {
     grid-column: 1 / -1;
     height: 3px;
@@ -155,13 +235,126 @@ function buildTooltipStyles(cfg: TooltipConfig, tooltipId: string): string {
     gap: 4px;
     font-size: ${Math.max(9, cfg.fontSize - 1)}px;
   }
+  ${scopedCustomCss}
 `;
+}
+
+function scopeTooltipCss(css: string, tooltipId: string): string {
+  if (typeof css !== 'string' || !css.trim()) {
+    return '';
+  }
+  return css.replace(/:tooltip\b/g, `#${tooltipId}`);
 }
 
 let tooltipStyleEl: HTMLStyleElement | null = null;
 let lastConfigKey = '';
+let tooltipKeyListenersBound = false;
+let tooltipAltPressed = false;
+let tooltipPinKey: 'alt' | 'shift' | 'ctrl' | 'meta' = 'alt';
+
+function isPinEvent(eventKey: string): boolean {
+  const key = (eventKey || '').toLowerCase();
+  switch (tooltipPinKey) {
+    case 'shift':
+      return key === 'shift';
+    case 'ctrl':
+      return key === 'control' || key === 'ctrl';
+    case 'meta':
+      return key === 'meta';
+    case 'alt':
+    default:
+      return key === 'alt';
+  }
+}
+
+function bindTooltipKeyListeners(): void {
+  if (tooltipKeyListenersBound || typeof window === 'undefined') return;
+  window.addEventListener('keydown', (e) => {
+    if (isPinEvent(e.key)) {
+      tooltipAltPressed = true;
+      updateTooltipInteractivity();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (isPinEvent(e.key)) {
+      tooltipAltPressed = false;
+      updateTooltipInteractivity();
+    }
+  });
+  window.addEventListener('blur', () => {
+    tooltipAltPressed = false;
+    updateTooltipInteractivity();
+  });
+  tooltipKeyListenersBound = true;
+}
+
+export function isTooltipPinned(): boolean {
+  return tooltipAltPressed;
+}
+
+function updateTooltipInteractivity(): void {
+  const el = document.getElementById(activeTooltipId) as HTMLDivElement | null;
+  if (!el) return;
+  el.style.pointerEvents = tooltipAltPressed ? 'auto' : 'none';
+}
+
+function bindSparklineInteractions(el: HTMLDivElement): void {
+  if ((el as any).__sparklineBound) return;
+  (el as any).__sparklineBound = true;
+
+  el.addEventListener('mousemove', (evt) => {
+    try {
+      const targetNode = evt.target;
+      if (!(targetNode instanceof Element)) {
+        return;
+      }
+
+      const svg = targetNode.closest('.tt-sparkline') as SVGSVGElement | null;
+      if (!svg) return;
+
+      const rawPoints = svg.dataset.points;
+      if (!rawPoints) return;
+      const points = decodeSparklinePoints(rawPoints);
+      if (points.length < 2) return;
+
+      const rect = svg.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, evt.clientX - rect.left));
+      const idx = Math.round((x / Math.max(1, rect.width)) * (points.length - 1));
+      const boundedIdx = Math.max(0, Math.min(points.length - 1, idx));
+      const point = points[boundedIdx];
+      const hoverTime = el.querySelector('.tt-chart-hover-time') as HTMLDivElement | null;
+      if (hoverTime) {
+        hoverTime.textContent = `t: ${new Date(point.ts).toLocaleString(navigator.language || 'es-ES')}`;
+      }
+
+      const marker = svg.querySelector('.tt-sparkline-marker') as SVGLineElement | null;
+      if (marker) {
+        const markerX = (boundedIdx / Math.max(1, points.length - 1)) * 100;
+        marker.setAttribute('x1', `${markerX}`);
+        marker.setAttribute('x2', `${markerX}`);
+        marker.style.opacity = '1';
+      }
+    } catch {
+      // Avoid breaking panel render due to tooltip interaction edge cases.
+    }
+  });
+
+  el.addEventListener('mouseleave', () => {
+    try {
+      const hoverTime = el.querySelector('.tt-chart-hover-time') as HTMLDivElement | null;
+      if (hoverTime) hoverTime.textContent = '';
+      el.querySelectorAll('.tt-sparkline-marker').forEach((m) => {
+        (m as SVGLineElement).style.opacity = '0';
+      });
+    } catch {
+      // Ignore tooltip cleanup errors to prevent plugin crash banners.
+    }
+  });
+}
 
 function ensureTooltipElement(cfg: TooltipConfig): HTMLDivElement {
+  tooltipPinKey = toPinKey((cfg as any).pinKey);
+  bindTooltipKeyListeners();
   let el = document.getElementById(activeTooltipId) as HTMLDivElement | null;
   if (!el) {
     el = document.createElement('div');
@@ -169,7 +362,7 @@ function ensureTooltipElement(cfg: TooltipConfig): HTMLDivElement {
     document.body.appendChild(el);
   }
   // Re-inject styles when config changes
-  const key = `${activeTooltipId}_${cfg.maxWidth}_${cfg.fontSize}_${cfg.fontFamily}_${cfg.backgroundColor}_${cfg.textColor}_${cfg.borderColor}_${cfg.borderRadius}_${cfg.padding}_${cfg.opacity}`;
+  const key = `${activeTooltipId}_${cfg.maxWidth}_${cfg.fontSize}_${cfg.fontFamily}_${cfg.backgroundColor}_${cfg.textColor}_${cfg.borderColor}_${cfg.borderRadius}_${cfg.padding}_${cfg.opacity}_${cfg.backdropBlur}_${cfg.shadowColor}_${cfg.shadowBlur}_${cfg.headerBackgroundColor}_${cfg.customCss}`;
   if (key !== lastConfigKey) {
     if (tooltipStyleEl) tooltipStyleEl.remove();
     tooltipStyleEl = document.createElement('style');
@@ -177,6 +370,8 @@ function ensureTooltipElement(cfg: TooltipConfig): HTMLDivElement {
     document.head.appendChild(tooltipStyleEl);
     lastConfigKey = key;
   }
+  bindSparklineInteractions(el);
+  updateTooltipInteractivity();
   return el;
 }
 
@@ -194,18 +389,75 @@ function formatMetricValue(value: number, unit: string): string {
 /**
  * Genera el HTML para una métrica individual en el tooltip.
  */
-function renderMetricRow(label: string, value: number, unit: string, color: string): string {
+function renderMetricRow(
+  label: string,
+  value: number,
+  unit: string,
+  color: string,
+  cfg: TooltipConfig,
+  history?: Array<{ ts: number; value: number }>
+): string {
   const formattedVal = formatMetricValue(value, unit);
   const c = sanitizeColor(color);
+  const sparkline = cfg.showMiniCharts && history && history.length > 1
+    ? renderMiniChart(history, c, cfg)
+    : '';
   return `
     <span class="tt-metric-dot" style="background:${c}"></span>
     <span class="tt-metric-label">${escapeHtml(label)}</span>
     <span class="tt-metric-value" style="color:${c}">${formattedVal}</span>
+    ${sparkline}
     ${unit === '%' ? `
       <div class="tt-bar-container">
         <div class="tt-bar" style="width:${Math.min(100, value)}%;background:${c}"></div>
       </div>
     ` : ''}
+  `;
+}
+
+function encodeSparklinePoints(points: Array<{ ts: number; value: number }>): string {
+  return points.map((p) => `${p.ts},${p.value}`).join(';');
+}
+
+function decodeSparklinePoints(encoded: string): Array<{ ts: number; value: number }> {
+  return encoded
+    .split(';')
+    .map((chunk) => {
+      const [tsStr, valStr] = chunk.split(',');
+      const ts = Number(tsStr);
+      const value = Number(valStr);
+      return Number.isFinite(ts) && Number.isFinite(value) ? { ts, value } : null;
+    })
+    .filter((p): p is { ts: number; value: number } => p !== null);
+}
+
+function renderMiniChart(points: Array<{ ts: number; value: number }>, color: string, cfg: TooltipConfig): string {
+  const maxPoints = Math.max(8, Math.min(200, cfg.miniChartPoints || 40));
+  const sliced = points.length > maxPoints ? points.slice(points.length - maxPoints) : points;
+  if (sliced.length < 2) return '';
+
+  const min = Math.min(...sliced.map((p) => p.value));
+  const max = Math.max(...sliced.map((p) => p.value));
+  const span = Math.max(1e-9, max - min);
+
+  const d = sliced
+    .map((p, i) => {
+      const x = (i / Math.max(1, sliced.length - 1)) * 100;
+      const y = 100 - ((p.value - min) / span) * 100;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+
+  const encoded = encodeSparklinePoints(sliced);
+  const h = Math.max(16, cfg.miniChartHeight || 26);
+
+  return `
+    <div class="tt-sparkline-wrap">
+      <svg class="tt-sparkline" data-points="${encoded}" viewBox="0 0 100 100" preserveAspectRatio="none" style="height:${h}px">
+        <path d="${d}" fill="none" stroke="${sanitizeColor(color)}" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+        <line class="tt-sparkline-marker" x1="0" y1="0" x2="0" y2="100" stroke="rgba(255,255,255,0.7)" stroke-width="1" style="opacity:0"></line>
+      </svg>
+    </div>
   `;
 }
 
@@ -261,28 +513,34 @@ export function showTooltip(
           <span class="tt-metric-value" style="color:${statusColor}">${statusText}</span>
         `;
       } else {
-        metricsHtml += renderMetricRow(mv.label, mv.value, mv.unit, SEVERITY_COLORS[mv.severity]);
+        metricsHtml += renderMetricRow(mv.label, mv.value, mv.unit, SEVERITY_COLORS[mv.severity], cfg);
       }
     }
     for (const [key, mv] of host.metrics) {
       if (orderedKeys.includes(key)) continue;
-      metricsHtml += renderMetricRow(mv.label, mv.value, mv.unit, SEVERITY_COLORS[mv.severity]);
+      metricsHtml += renderMetricRow(mv.label, mv.value, mv.unit, SEVERITY_COLORS[mv.severity], cfg);
     }
     if (!metricsHtml) {
       metricsHtml = '<span style="color:#666;grid-column:1/-1;text-align:center;padding:4px 0">Sin datos disponibles</span>';
     }
-    metricsHtml = `<div class="tt-metrics">${metricsHtml}</div>`;
+    metricsHtml = `<div class="tt-metrics">${metricsHtml}</div><div class="tt-chart-hover-time"></div>`;
   }
 
   const timeHtml = cfg.showTimestamp
-    ? `<div class="tt-time">${new Date().toLocaleTimeString(navigator.language || 'es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>`
+    ? `<div class="tt-time">${formatTimestamp()}</div>`
     : '';
 
   const severityHtml = cfg.showSeverity
     ? `<span class="tt-severity" style="background:${color}22;color:${color}">${host.severity}</span>`
     : '';
 
-  el.innerHTML = `
+  el.innerHTML = renderTooltipMarkup(cfg, {
+    hostname: host.hostname,
+    severity: host.severity,
+    severityColor: color,
+    timeHtml,
+    metricsHtml,
+    defaultHtml: `
     <div class="tt-header">
       <span class="tt-dot" style="background:${color};color:${color}"></span>
       <span class="tt-hostname">${escapeHtml(host.hostname)}</span>
@@ -291,12 +549,14 @@ export function showTooltip(
     ${timeHtml}
     ${metricsHtml}
     ${host.isCombined ? '<div style="margin-top:8px;color:#666;font-size:10px;text-align:center">Hosts combinados</div>' : ''}
-  `;
+  `,
+  });
 
   positionTooltip(el, x, y);
 }
 
 export function hideTooltip(): void {
+  if (tooltipAltPressed) return;
   const el = document.getElementById(activeTooltipId);
   if (el) el.classList.remove('visible');
 }
@@ -316,6 +576,9 @@ export interface TooltipEntry {
   unit: string;
   color: string;
   isPercentage: boolean;
+  history?: Array<{ ts: number; value: number }>;
+  /** When true, this entry is excluded from the cell worst-severity calculation */
+  skipCellSeverity?: boolean;
 }
 
 export function showCustomTooltip(
@@ -351,13 +614,14 @@ export function showCustomTooltip(
     for (const entry of entries) {
       const ec = sanitizeColor(entry.color);
       if (entry.isPercentage && typeof entry.value === 'number') {
-        metricsHtml += renderMetricRow(entry.label, entry.value, '%', ec);
+        metricsHtml += renderMetricRow(entry.label, entry.value, '%', ec, cfg, entry.history);
       } else if (typeof entry.value === 'number') {
         const fmt = Number.isInteger(entry.value) ? entry.value.toString() : entry.value.toFixed(2);
         metricsHtml += `
           <span class="tt-metric-dot" style="background:${ec}"></span>
           <span class="tt-metric-label">${escapeHtml(entry.label)}</span>
           <span class="tt-metric-value" style="color:${ec}">${fmt}${entry.unit ? ' ' + entry.unit : ''}</span>
+          ${cfg.showMiniCharts && entry.history && entry.history.length > 1 ? renderMiniChart(entry.history, ec, cfg) : ''}
         `;
       } else {
         metricsHtml += `
@@ -370,21 +634,22 @@ export function showCustomTooltip(
     if (!metricsHtml) {
       metricsHtml = '<span style="color:#666;grid-column:1/-1;text-align:center;padding:4px 0">Sin datos</span>';
     }
-    metricsHtml = `<div class="tt-metrics">${metricsHtml}</div>`;
+    metricsHtml = `<div class="tt-metrics">${metricsHtml}</div><div class="tt-chart-hover-time"></div>`;
   }
 
-  const locale = navigator.language || 'es-ES';
-  const now = dataTimestamp
-    ? new Date(dataTimestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  const timeHtml = cfg.showTimestamp ? `<div class="tt-time">${now}</div>` : '';
+  const timeHtml = cfg.showTimestamp ? `<div class="tt-time">${formatTimestamp(dataTimestamp)}</div>` : '';
 
   const severityHtml = cfg.showSeverity
     ? `<span class="tt-severity" style="background:${color}22;color:${color}">${severity}</span>`
     : '';
 
-  el.innerHTML = `
+  el.innerHTML = renderTooltipMarkup(cfg, {
+    hostname,
+    severity,
+    severityColor: color,
+    timeHtml,
+    metricsHtml,
+    defaultHtml: `
     <div class="tt-header">
       <span class="tt-dot" style="background:${color};color:${color}"></span>
       <span class="tt-hostname">${escapeHtml(hostname)}</span>
@@ -392,7 +657,8 @@ export function showCustomTooltip(
     </div>
     ${timeHtml}
     ${metricsHtml}
-  `;
+  `,
+  });
 
   positionTooltip(el, x, y);
 }
@@ -400,16 +666,53 @@ export function showCustomTooltip(
 // ─── Shared positioning logic ───────────────────────────────
 
 function positionTooltip(el: HTMLDivElement, x: number, y: number): void {
+  if (tooltipAltPressed && el.classList.contains('visible')) {
+    return;
+  }
   const pad = 16;
   requestAnimationFrame(() => {
     const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     let left = x + pad;
     let top = y + pad;
-    if (left + rect.width > window.innerWidth - pad) left = x - rect.width - pad;
-    if (top + rect.height > window.innerHeight - pad) top = y - rect.height - pad;
-    el.style.left = `${Math.max(pad, left)}px`;
-    el.style.top = `${Math.max(pad, top)}px`;
+    if (left + rect.width > vw - pad) left = x - rect.width - pad;
+    if (top + rect.height > vh - pad) top = y - rect.height - pad;
+    // Ensure tooltip never goes off-screen
+    left = Math.max(pad, Math.min(left, vw - rect.width - pad));
+    top = Math.max(pad, Math.min(top, vh - rect.height - pad));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
     el.classList.add('visible');
+  });
+}
+
+function renderTooltipMarkup(
+  cfg: TooltipConfig,
+  data: {
+    hostname: string;
+    severity: Severity;
+    severityColor: string;
+    timeHtml: string;
+    metricsHtml: string;
+    defaultHtml: string;
+  }
+): string {
+  const template = typeof cfg.htmlTemplate === 'string' ? cfg.htmlTemplate.trim() : '';
+  if (!template) {
+    return data.defaultHtml;
+  }
+
+  const raw = template
+    .replace(/\{\{hostname\}\}/g, escapeHtml(data.hostname))
+    .replace(/\{\{severity\}\}/g, escapeHtml(data.severity))
+    .replace(/\{\{severityColor\}\}/g, sanitizeColor(data.severityColor))
+    .replace(/\{\{time\}\}/g, data.timeHtml)
+    .replace(/\{\{metricsHtml\}\}/g, data.metricsHtml);
+
+  return DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: ['div', 'span', 'strong', 'em', 'b', 'i', 'small', 'br'],
+    ALLOWED_ATTR: ['class', 'style'],
   });
 }
 

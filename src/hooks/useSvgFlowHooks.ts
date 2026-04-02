@@ -194,6 +194,18 @@ export function useSortedSeries(series: DataFrame[]): { sortedSeries: DataFrame[
       );
       if (!field || field.values.length <= 1) return frame;
 
+      // P-C: Skip sort if already sorted ascending
+      let alreadySorted = true;
+      for (let i = 1; i < field.values.length; i++) {
+        const prev = field.values[i - 1];
+        const curr = field.values[i];
+        if (prev != null && curr != null && prev > curr) {
+          alreadySorted = false;
+          break;
+        }
+      }
+      if (alreadySorted) return frame;
+
       const indices = Array.from({ length: field.values.length }, (_, i) => i);
       indices.sort((a, b) => {
         const va = field.values[a];
@@ -319,25 +331,25 @@ export function emptyMetricsCache(): MetricsCache {
 
 const ANIMATION_STYLES = `
   @keyframes svgflow-pulso-critico {
-    0%, 100% { filter: drop-shadow(0 0 4px rgba(218, 32, 32, 0.6)); }
-    50% { filter: drop-shadow(0 0 12px rgba(218, 32, 32, 0.9)); }
+    0%, 100% { filter: drop-shadow(0 0 var(--svgflow-critical-glow-min, 4px) var(--svgflow-critical-glow-color, rgba(218, 32, 32, 0.6))); }
+    50% { filter: drop-shadow(0 0 var(--svgflow-critical-glow-max, 12px) var(--svgflow-critical-glow-color, rgba(218, 32, 32, 0.9))); }
   }
   .svgflow-shape {
     transition: fill 0.4s ease, filter 0.3s ease;
   }
   .svgflow-shape-critico {
-    animation: svgflow-pulso-critico 2s ease-in-out infinite;
+    animation: svgflow-pulso-critico var(--svgflow-critical-pulse-duration, 2s) ease-in-out infinite;
   }
   .svgflow-target {
     cursor: pointer;
   }
   .svgflow-target:hover .svgflow-shape {
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3)) brightness(1.15);
+    filter: drop-shadow(0 0 var(--svgflow-hover-glow-radius, 8px) var(--svgflow-hover-glow-color, rgba(255, 255, 255, 0.3))) brightness(var(--svgflow-hover-brightness, 1.15));
   }
   @keyframes svgflow-locate-pulse {
     0% { filter: drop-shadow(0 0 0px rgba(60, 140, 255, 0)) brightness(1); }
-    30% { filter: drop-shadow(0 0 20px rgba(60, 140, 255, 0.9)) brightness(1.4); }
-    60% { filter: drop-shadow(0 0 35px rgba(60, 140, 255, 0.5)) brightness(1.2); }
+    30% { filter: drop-shadow(0 0 calc(var(--svgflow-locate-glow-radius, 35px) * 0.57) var(--svgflow-locate-glow-color, rgba(60, 140, 255, 0.9))) brightness(1.4); }
+    60% { filter: drop-shadow(0 0 var(--svgflow-locate-glow-radius, 35px) color-mix(in srgb, var(--svgflow-locate-glow-color, rgba(60, 140, 255, 0.9)) 55%, transparent)) brightness(1.2); }
     100% { filter: drop-shadow(0 0 0px rgba(60, 140, 255, 0)) brightness(1); }
   }
   .svgflow-locating {
@@ -349,10 +361,10 @@ const ANIMATION_STYLES = `
     z-index: 9999;
   }
   .svgflow-nodata {
-    stroke: #90a4ae !important;
-    stroke-dasharray: 6 3;
+    stroke: var(--svgflow-nodata-stroke-color, #90a4ae) !important;
+    stroke-dasharray: var(--svgflow-nodata-stroke-dasharray, 6 3);
     stroke-width: 2;
-    opacity: 0.6;
+    opacity: var(--svgflow-nodata-opacity, 0.6);
   }
 `;
 const STYLE_ID = 'svgflow-animation-styles';

@@ -14,9 +14,9 @@ const __dirname = path.dirname(__filename);
 
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
 
-const config = (env: Record<string, string>, argv: { mode?: string }): Configuration => {
+const config = (env: Record<string, unknown>, argv: { mode?: string }): Configuration => {
   const isProduction =
-    env.production === 'true' || env.production === '' ||
+    !!env.production ||
     argv.mode === 'production';
 
   return {
@@ -35,16 +35,26 @@ const config = (env: Record<string, string>, argv: { mode?: string }): Configura
       clean: true,
     },
     externals: [
-      'react',
-      'react-dom',
-      '@grafana/data',
-      '@grafana/ui',
-      '@grafana/runtime',
-      '@grafana/schema',
-      'lodash',
-      'emotion',
-      '@emotion/css',
-      '@emotion/react',
+      // Function-based external to catch react/* sub-paths (jsx-runtime, jsx-dev-runtime)
+      function ({ request }, callback) {
+        if (request === 'react' || request?.startsWith('react/') || request === 'react-dom') {
+          return callback(null, 'react');
+        }
+        const staticExternals = [
+          '@grafana/data',
+          '@grafana/ui',
+          '@grafana/runtime',
+          '@grafana/schema',
+          'lodash',
+          'emotion',
+          '@emotion/css',
+          '@emotion/react',
+        ];
+        if (request && staticExternals.includes(request)) {
+          return callback(null, request);
+        }
+        callback();
+      },
     ],
     resolve: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
@@ -73,6 +83,7 @@ const config = (env: Record<string, string>, argv: { mode?: string }): Configura
                 transform: {
                   react: {
                     runtime: 'automatic',
+                    development: !isProduction,
                   },
                 },
                 target: 'es2021',
@@ -91,6 +102,9 @@ const config = (env: Record<string, string>, argv: { mode?: string }): Configura
         patterns: [
           { from: 'src/plugin.json', to: 'plugin.json' },
           { from: 'src/img', to: 'img', noErrorOnMissing: true },
+          { from: 'README.md', to: 'README.md', noErrorOnMissing: true },
+          { from: 'LICENSE', to: 'LICENSE', toType: 'file', noErrorOnMissing: true },
+          { from: 'CHANGELOG.md', to: 'CHANGELOG.md', noErrorOnMissing: true },
         ],
       }),
       new ForkTsCheckerWebpackPlugin({

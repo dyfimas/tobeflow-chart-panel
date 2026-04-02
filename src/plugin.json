@@ -1,20 +1,41 @@
 {
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "panel",
   "name": "ToBeFlow Chart Panel",
   "id": "tobeflow-chart-panel",
   "info": {
-    "description": "ToBeFlow Chart Panel – Interactive SVG with data-driven coloring, tooltips and host mapping.",
+    "description": "Interactive SVG panel with data-driven coloring, tooltips and host mapping. Visualize infrastructure on custom SVG diagrams with real-time metrics.",
     "author": {
       "name": "ToBeIT",
       "url": "https://tobeit.es"
     },
-    "keywords": ["tobeflow", "svg", "flow", "chart", "diagram", "topology"],
+    "keywords": ["tobeflow", "svg", "flow", "chart", "diagram", "topology", "infrastructure", "monitoring", "visualization"],
     "version": "%VERSION%",
     "updated": "%TODAY%",
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
-    }
+    },
+    "links": [
+      {
+        "name": "repository",
+        "url": "https://github.com/dyfimas/tobeflow-chart-panel"
+      },
+      {
+        "name": "license",
+        "url": "https://github.com/dyfimas/tobeflow-chart-panel/blob/main/LICENSE"
+      },
+      {
+        "name": "documentation",
+        "url": "https://github.com/dyfimas/tobeflow-chart-panel/blob/main/README.md"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "Datacenter SVG example",
+        "path": "img/example-datacenter.svg"
+      }
+    ]
   },
   "dependencies": {
     "grafanaDependency": ">=10.0.0",

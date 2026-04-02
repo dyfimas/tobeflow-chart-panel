@@ -4,13 +4,17 @@
 // ─────────────────────────────────────────────────────────────
 import { PanelProps, DataFrame } from '@grafana/data';
 import { useTheme2 } from '@grafana/ui';
-import { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   SvgFlowOptions,
   HostMetrics,
   CellMapping,
   Severity,
   COLORES,
+  SEVERITY_COLORS,
+  DEFAULT_TOOLTIP_CONFIG,
+  DEFAULT_VISUAL_STYLE,
+  VisualStyleConfig,
 } from '../types';
 import {
   resolverHost,
@@ -20,6 +24,7 @@ import {
   destroyTooltip,
   createTooltipScope,
   setTooltipScope,
+  isTooltipPinned,
 } from '../utils';
 import type { TooltipEntry } from '../utils';
 import {
@@ -45,13 +50,38 @@ import {
 } from '../hooks/useSvgFlowHooks';
 
 // ─── Chunk size for batch DOM updates (P10: adaptive) ───────
-function getChunkSize(targetCount: number): number {
-  if (targetCount <= 50) return targetCount; // small SVG: process all at once
-  if (targetCount <= 200) return 25;
-  return 10; // large SVG: keep small chunks
-}
+const ADAPTIVE_TARGET_MS = 8; // half frame budget at 60fps
 
-// ─── P2: Extracted helpers for main useEffect decomposition ──
+function processTargetsInBatches(targets: Element[], ctx: CellProcessingContext): void {
+  let chunkSize = targets.length <= 50 ? targets.length : 15;
+
+  function processChunk(startIdx: number) {
+    const endIdx = Math.min(startIdx + chunkSize, targets.length);
+    const t0 = performance.now();
+
+    for (let i = startIdx; i < endIdx; i++) {
+      processSingleCell(targets[i], ctx);
+    }
+
+    const elapsed = performance.now() - t0;
+
+    // Adapt chunk size based on actual time
+    if (elapsed < ADAPTIVE_TARGET_MS * 0.5 && chunkSize < targets.length) {
+      chunkSize = Math.min(chunkSize * 2, targets.length);
+    } else if (elapsed > ADAPTIVE_TARGET_MS && chunkSize > 4) {
+      chunkSize = Math.max(4, Math.floor(chunkSize / 2));
+    }
+
+    if (endIdx < targets.length) {
+      requestAnimationFrame(() => processChunk(endIdx));
+    } else {
+      flushCellDebugBatch();
+      window.dispatchEvent(new CustomEvent('svgflow-severity-summary', { detail: ctx.severityCounts }));
+    }
+  }
+
+  requestAnimationFrame(() => processChunk(0));
+}
 
 /** Inject SVG into container, clean debug overlays, normalize SVG sizing */
 function prepareSvgContainer(container: HTMLDivElement, svgHtml: string, debugMode: boolean): void {
@@ -147,26 +177,6 @@ function collectTargetCells(
   return targets;
 }
 
-function processTargetsInBatches(targets: Element[], ctx: CellProcessingContext): void {
-  function processChunk(startIdx: number) {
-    const chunkSize = getChunkSize(targets.length);
-    const endIdx = Math.min(startIdx + chunkSize, targets.length);
-
-    for (let i = startIdx; i < endIdx; i++) {
-      processSingleCell(targets[i], ctx);
-    }
-
-    if (endIdx < targets.length) {
-      requestAnimationFrame(() => processChunk(endIdx));
-    } else {
-      flushCellDebugBatch();
-      window.dispatchEvent(new CustomEvent('svgflow-severity-summary', { detail: ctx.severityCounts }));
-    }
-  }
-
-  requestAnimationFrame(() => processChunk(0));
-}
-
 /**
  * P2: Process a single SVG cell (g[data-cell-id]) — extracted from the main useEffect loop.
  * Returns early if the cell should be skipped.
@@ -244,8 +254,8 @@ function processSingleCell(target: Element, ctx: CellProcessingContext): void {
       fieldValueIndex: ctx.metricsCache.fieldValueIndex,
       hostSearchIndex: effectiveHostIndex,
     });
-    color = result.color;
     severity = result.severity;
+    color = resolveContainerSeverityColor(result.color, severity, ctx.options.visualStyle);
     mappedTooltip = result.entries;
     skipColor = false;
     if (result.latestMetricTs != null) {
@@ -334,9 +344,52 @@ function processSingleCell(target: Element, ctx: CellProcessingContext): void {
   }
 }
 
+function resolveContainerSeverityColor(baseColor: string, severity: Severity, visualStyle: VisualStyleConfig): string {
+  const mapped: Record<Severity, string> = {
+    [Severity.CRITICO]: visualStyle.containerColorCritical,
+    [Severity.MAJOR]: visualStyle.containerColorMajor,
+    [Severity.MINOR]: visualStyle.containerColorMinor,
+    [Severity.WARNING]: visualStyle.containerColorWarning,
+    [Severity.NORMAL]: visualStyle.containerColorNormal,
+    [Severity.SIN_DATOS]: visualStyle.containerColorNoData,
+  };
+  const next = mapped[severity];
+  return typeof next === 'string' && next.trim() ? next : baseColor;
+}
+
 // ─── Componente ─────────────────────────────────────────────
 
-export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
+// B1: ErrorBoundary — catches render-time errors from our own code.
+// Cannot intercept errors from Grafana-core siblings (e.g. TooltipPlugin2)
+// but protects the panel from our own regressions showing the error banner.
+interface EBState { hasError: boolean; message: string }
+class SvgFlowErrorBoundary extends React.Component<{ width: number; height: number; children: React.ReactNode }, EBState> {
+  state: EBState = { hasError: false, message: '' };
+  static getDerivedStateFromError(error: Error): EBState {
+    return { hasError: true, message: error.message || 'Unknown error' };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ width: this.props.width, height: this.props.height, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, color: '#f85149', fontSize: 13 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, marginBottom: 6 }}>⚠️ SvgFlow render error</div>
+            <div>{this.state.message}</div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = (props) => (
+  <SvgFlowErrorBoundary width={props.width} height={props.height}>
+    <SvgFlowPanelInner {...props} />
+  </SvgFlowErrorBoundary>
+);
+
+const SvgFlowPanelInner: React.FC<PanelProps<SvgFlowOptions>> = ({
   data,
   width,
   height,
@@ -347,11 +400,56 @@ export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const listenersRef = useRef<Array<() => void>>([]);
   const [timelineIndex, setTimelineIndex] = useState<number | null>(null);
+  const [pickModeActive, setPickModeActive] = useState(false);
   const cellTimestampsRef = useRef<Map<string, number>>(new Map());
+  const panelScopeRef = useRef(`svgflow-panel-${Math.random().toString(36).slice(2, 10)}`);
+  const visualStyle: VisualStyleConfig = normalizeVisualStyle(options.visualStyle);
+  const tooltipConfig = normalizeTooltipConfig(options.tooltipConfig);
 
   // F2: Multi-panel tooltip isolation
   const tooltipScopeRef = useRef(createTooltipScope());
   useEffect(() => { setTooltipScope(tooltipScopeRef.current); }, []);
+
+  useEffect(() => {
+    const onWindowError = (event: ErrorEvent) => {
+      const msg = String(event.message || '');
+      const stack = String((event.error as any)?.stack || '');
+      const isKnownTooltipBug =
+        msg.includes("Cannot read properties of null (reading 'contains')") &&
+        stack.includes('TooltipPlugin2');
+      if (!isKnownTooltipBug) {
+        return;
+      }
+      event.preventDefault();
+      if (typeof (event as any).stopImmediatePropagation === 'function') {
+        (event as any).stopImmediatePropagation();
+      }
+      logWarning('Ignored known TooltipPlugin2 null.contains runtime error');
+    };
+
+    window.addEventListener('error', onWindowError);
+    return () => {
+      window.removeEventListener('error', onWindowError);
+    };
+  }, []);
+
+  useEffect(() => {
+    const styleId = `svgflow-custom-style-${panelScopeRef.current}`;
+    const existing = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (existing) {
+      existing.remove();
+    }
+    if (typeof visualStyle.customCss !== 'string' || !visualStyle.customCss.trim()) {
+      return;
+    }
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = scopePanelCss(visualStyle.customCss, panelScopeRef.current);
+    document.head.appendChild(styleEl);
+    return () => {
+      styleEl.remove();
+    };
+  }, [visualStyle.customCss]);
 
   // L2: Extracted hooks
   const { svgContentRef, svgLoaded, error } = useSvgLoader(options, theme.isDark, replaceVariables);
@@ -370,6 +468,20 @@ export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
     options.hostField || '', options.cellMappings || [],
     customThresholdsData, metricsConfig, timelineIndex,
   );
+
+  // Track pick-mode state for visual indicator
+  useEffect(() => {
+    const onPickStart = () => setPickModeActive(true);
+    const onPickEnd = () => setPickModeActive(false);
+    window.addEventListener('svgflow-pick-start', onPickStart);
+    window.addEventListener('svgflow-pick-cancel', onPickEnd);
+    window.addEventListener('svgflow-cell-selected', onPickEnd);
+    return () => {
+      window.removeEventListener('svgflow-pick-start', onPickStart);
+      window.removeEventListener('svgflow-pick-cancel', onPickEnd);
+      window.removeEventListener('svgflow-cell-selected', onPickEnd);
+    };
+  }, []);
 
   // ── Debug mode toggle ──
   setDebugEnabled(!!options.debugMode);
@@ -410,7 +522,7 @@ export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
       sortedSeries,
       globalThresholds,
       replaceVariables,
-      options,
+      options: { ...options, tooltipConfig, visualStyle },
       dataTimestamp,
       listenersRef,
       pickModeRef,
@@ -454,7 +566,7 @@ export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
 
   // ── Render ──
   if (error) {
-    return (
+      return (
       <div
         style={{
           width,
@@ -479,7 +591,37 @@ export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
   }
 
   return (
-    <div style={{ width, height, overflow: 'hidden', position: 'relative', background: 'transparent' }}>
+    <div
+      data-svgflow-scope={panelScopeRef.current}
+      className="svgflow-panel-shell"
+      style={{
+        width,
+        height,
+        overflow: 'hidden',
+        position: 'relative',
+        background: visualStyle.panelBackgroundColor,
+        border: `1px solid ${visualStyle.panelBorderColor}`,
+        borderRadius: visualStyle.panelBorderRadius,
+        boxShadow: visualStyle.panelBoxShadow,
+        backdropFilter: visualStyle.panelBackdropBlur > 0 ? `blur(${visualStyle.panelBackdropBlur}px)` : undefined,
+        WebkitBackdropFilter: visualStyle.panelBackdropBlur > 0 ? `blur(${visualStyle.panelBackdropBlur}px)` : undefined,
+        padding: visualStyle.panelPadding,
+        boxSizing: 'border-box',
+        ['--svgflow-hover-glow-color' as any]: visualStyle.hoverGlowColor,
+        ['--svgflow-hover-glow-radius' as any]: `${visualStyle.hoverGlowRadius}px`,
+        ['--svgflow-hover-brightness' as any]: String(visualStyle.hoverBrightness),
+        ['--svgflow-critical-glow-color' as any]: visualStyle.criticalGlowColor,
+        ['--svgflow-critical-glow-min' as any]: `${visualStyle.criticalGlowMin}px`,
+        ['--svgflow-critical-glow-max' as any]: `${visualStyle.criticalGlowMax}px`,
+        ['--svgflow-critical-pulse-duration' as any]: `${visualStyle.criticalPulseDuration}s`,
+        ['--svgflow-locate-glow-color' as any]: visualStyle.locateGlowColor,
+        ['--svgflow-locate-glow-radius' as any]: `${visualStyle.locateGlowRadius}px`,
+        ['--svgflow-nodata-stroke-color' as any]: visualStyle.noDataStrokeColor,
+        ['--svgflow-nodata-stroke-dasharray' as any]: visualStyle.noDataStrokeDasharray,
+        ['--svgflow-nodata-opacity' as any]: String(visualStyle.noDataOpacity),
+      }}
+    >
+      <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative', borderRadius: 'inherit' }}>
       {/* B1: JSON parse error feedback */}
       {parseErrors.length > 0 && (
         <div style={{
@@ -521,6 +663,76 @@ export const SvgFlowPanel: React.FC<PanelProps<SvgFlowOptions>> = ({
           }}
         />
       ))}
+      {/* NF-1: Severity legend overlay (toggleable) */}
+      {options.showSeverityLegend && (
+        <div style={{
+          position: 'absolute', bottom: 6, right: 6, zIndex: 90,
+          display: 'flex', flexDirection: 'column', gap: 2,
+          padding: '4px 6px', borderRadius: 4,
+          background: 'rgba(15, 23, 42, 0.85)', fontSize: 9,
+          fontFamily: 'monospace', color: '#e0e0e0', pointerEvents: 'none',
+          backdropFilter: 'blur(4px)',
+        }}>
+          {([Severity.NORMAL, Severity.WARNING, Severity.MINOR, Severity.MAJOR, Severity.CRITICO] as const).map(sev => (
+            <div key={sev} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: SEVERITY_COLORS[sev], flexShrink: 0 }} />
+              <span>{sev}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* NF-2: No-data message overlay (toggleable) */}
+      {options.showNoDataMessage && svgLoaded && getMetrics().metricsMap.size === 0 && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 80,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            padding: '12px 20px', borderRadius: 6,
+            background: 'rgba(15, 23, 42, 0.8)', color: '#90a4ae',
+            fontSize: 13, textAlign: 'center', backdropFilter: 'blur(4px)',
+          }}>
+            <div style={{ fontSize: 22, marginBottom: 4 }}>📡</div>
+            <div>Sin datos disponibles</div>
+            <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>Verifica el datasource y los mappings</div>
+          </div>
+        </div>
+      )}
+      {/* UX-5: Loading spinner (toggleable) */}
+      {options.showLoadingIndicator && !svgLoaded && !error && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 95,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            width: 28, height: 28, border: '3px solid rgba(255,255,255,0.15)',
+            borderTopColor: '#42a5f5', borderRadius: '50%',
+            animation: 'svgflow-spin 0.8s linear infinite',
+          }} />
+          <style>{`@keyframes svgflow-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+      {/* UX-3: Pick mode indicator overlay (toggleable) */}
+      {options.showPickModeIndicator && pickModeActive && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 85,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(66, 165, 245, 0.06)', cursor: 'crosshair',
+          border: '2px dashed rgba(66, 165, 245, 0.4)', borderRadius: 'inherit',
+        }}>
+          <div style={{
+            padding: '6px 14px', borderRadius: 4,
+            background: 'rgba(15, 23, 42, 0.85)', color: '#42a5f5',
+            fontSize: 12, fontFamily: 'monospace', pointerEvents: 'none',
+            backdropFilter: 'blur(4px)',
+          }}>
+            Haz click en una celda del SVG
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 };
@@ -581,10 +793,12 @@ function attachCellListeners(
 ): void {
   const hd = hostData;
   target.classList.add('svgflow-target');
+  const visualStyle = { ...DEFAULT_VISUAL_STYLE, ...(options.visualStyle || {}) };
+  const tooltipConfig = { ...DEFAULT_TOOLTIP_CONFIG, ...(options.tooltipConfig || {}) };
 
   const onMouseEnter = () => {
     shapes.forEach((s) => {
-      (s as SVGElement).style.filter = `drop-shadow(0 0 8px ${color}) brightness(1.15)`;
+      (s as SVGElement).style.filter = `drop-shadow(0 0 ${visualStyle.hoverGlowRadius}px ${visualStyle.hoverGlowColor || color}) brightness(${visualStyle.hoverBrightness})`;
     });
   };
 
@@ -595,13 +809,16 @@ function attachCellListeners(
 
   let lastTooltipTime = 0;
   const onMouseMove = (e: Event) => {
+    if (isTooltipPinned()) {
+      return;
+    }
     const now = Date.now();
     if (now - lastTooltipTime < 50) return;
     lastTooltipTime = now;
     const me = e as MouseEvent;
     if (mappedTooltip && mappedTooltip.length > 0) {
       const cellTs = cellTimestampsRef.current.get(cellId) ?? dataTimestamp;
-      showCustomTooltipFn(hd?.hostname || cellId, severity, mappedTooltip, me.clientX, me.clientY, cellTs, options.tooltipConfig);
+      showCustomTooltipFn(cellMapping?.label || resolvedHost || cellId, severity, mappedTooltip, me.clientX, me.clientY, cellTs, tooltipConfig);
     }
   };
 
@@ -613,8 +830,8 @@ function attachCellListeners(
         detail: { cellId, resolvedHost: resolvedHost || '' },
       }));
       shapes.forEach((s) => {
-        (s as SVGElement).style.filter = 'brightness(1.8) drop-shadow(0 0 14px #00ff88)';
-        setTimeout(() => { (s as SVGElement).style.filter = ''; }, 600);
+        (s as SVGElement).style.filter = `brightness(1.8) drop-shadow(0 0 ${Math.max(visualStyle.hoverGlowRadius, 14)}px ${visualStyle.clickFlashColor})`;
+        setTimeout(() => { (s as SVGElement).style.filter = ''; }, visualStyle.clickFlashDuration);
       });
       return;
     }
@@ -639,6 +856,63 @@ function attachCellListeners(
     () => target.removeEventListener('mousemove', onMouseMove),
     () => target.removeEventListener('click', onClick),
   );
+}
+
+function scopePanelCss(css: string, scopeId: string): string {
+  if (typeof css !== 'string' || !css.trim()) {
+    return '';
+  }
+  return css.replace(/:scope\b/g, `[data-svgflow-scope="${scopeId}"]`);
+}
+
+function normalizeVisualStyle(value?: Partial<VisualStyleConfig> | null): VisualStyleConfig {
+  const merged = { ...DEFAULT_VISUAL_STYLE, ...(value || {}) } as any;
+  return {
+    ...DEFAULT_VISUAL_STYLE,
+    ...merged,
+    panelBackgroundColor: typeof merged.panelBackgroundColor === 'string' ? merged.panelBackgroundColor : DEFAULT_VISUAL_STYLE.panelBackgroundColor,
+    panelBorderColor: typeof merged.panelBorderColor === 'string' ? merged.panelBorderColor : DEFAULT_VISUAL_STYLE.panelBorderColor,
+    panelBorderRadius: Number.isFinite(merged.panelBorderRadius) ? merged.panelBorderRadius : DEFAULT_VISUAL_STYLE.panelBorderRadius,
+    panelPadding: Number.isFinite(merged.panelPadding) ? merged.panelPadding : DEFAULT_VISUAL_STYLE.panelPadding,
+    panelBoxShadow: typeof merged.panelBoxShadow === 'string' ? merged.panelBoxShadow : DEFAULT_VISUAL_STYLE.panelBoxShadow,
+    panelBackdropBlur: Number.isFinite(merged.panelBackdropBlur) ? merged.panelBackdropBlur : DEFAULT_VISUAL_STYLE.panelBackdropBlur,
+    hoverGlowColor: typeof merged.hoverGlowColor === 'string' ? merged.hoverGlowColor : DEFAULT_VISUAL_STYLE.hoverGlowColor,
+    hoverGlowRadius: Number.isFinite(merged.hoverGlowRadius) ? merged.hoverGlowRadius : DEFAULT_VISUAL_STYLE.hoverGlowRadius,
+    hoverBrightness: Number.isFinite(merged.hoverBrightness) ? merged.hoverBrightness : DEFAULT_VISUAL_STYLE.hoverBrightness,
+    criticalGlowColor: typeof merged.criticalGlowColor === 'string' ? merged.criticalGlowColor : DEFAULT_VISUAL_STYLE.criticalGlowColor,
+    criticalGlowMin: Number.isFinite(merged.criticalGlowMin) ? merged.criticalGlowMin : DEFAULT_VISUAL_STYLE.criticalGlowMin,
+    criticalGlowMax: Number.isFinite(merged.criticalGlowMax) ? merged.criticalGlowMax : DEFAULT_VISUAL_STYLE.criticalGlowMax,
+    criticalPulseDuration: Number.isFinite(merged.criticalPulseDuration) ? merged.criticalPulseDuration : DEFAULT_VISUAL_STYLE.criticalPulseDuration,
+    locateGlowColor: typeof merged.locateGlowColor === 'string' ? merged.locateGlowColor : DEFAULT_VISUAL_STYLE.locateGlowColor,
+    locateGlowRadius: Number.isFinite(merged.locateGlowRadius) ? merged.locateGlowRadius : DEFAULT_VISUAL_STYLE.locateGlowRadius,
+    noDataStrokeColor: typeof merged.noDataStrokeColor === 'string' ? merged.noDataStrokeColor : DEFAULT_VISUAL_STYLE.noDataStrokeColor,
+    noDataStrokeDasharray: typeof merged.noDataStrokeDasharray === 'string' ? merged.noDataStrokeDasharray : DEFAULT_VISUAL_STYLE.noDataStrokeDasharray,
+    noDataOpacity: Number.isFinite(merged.noDataOpacity) ? merged.noDataOpacity : DEFAULT_VISUAL_STYLE.noDataOpacity,
+    containerColorCritical: typeof merged.containerColorCritical === 'string' ? merged.containerColorCritical : DEFAULT_VISUAL_STYLE.containerColorCritical,
+    containerColorMajor: typeof merged.containerColorMajor === 'string' ? merged.containerColorMajor : DEFAULT_VISUAL_STYLE.containerColorMajor,
+    containerColorMinor: typeof merged.containerColorMinor === 'string' ? merged.containerColorMinor : DEFAULT_VISUAL_STYLE.containerColorMinor,
+    containerColorWarning: typeof merged.containerColorWarning === 'string' ? merged.containerColorWarning : DEFAULT_VISUAL_STYLE.containerColorWarning,
+    containerColorNormal: typeof merged.containerColorNormal === 'string' ? merged.containerColorNormal : DEFAULT_VISUAL_STYLE.containerColorNormal,
+    containerColorNoData: typeof merged.containerColorNoData === 'string' ? merged.containerColorNoData : DEFAULT_VISUAL_STYLE.containerColorNoData,
+    clickFlashColor: typeof merged.clickFlashColor === 'string' ? merged.clickFlashColor : DEFAULT_VISUAL_STYLE.clickFlashColor,
+    clickFlashDuration: Number.isFinite(merged.clickFlashDuration) ? merged.clickFlashDuration : DEFAULT_VISUAL_STYLE.clickFlashDuration,
+    customCss: typeof merged.customCss === 'string' ? merged.customCss : DEFAULT_VISUAL_STYLE.customCss,
+  };
+}
+
+function normalizeTooltipConfig(value?: Partial<typeof DEFAULT_TOOLTIP_CONFIG> | null) {
+  const merged = { ...DEFAULT_TOOLTIP_CONFIG, ...(value || {}) } as any;
+  const pinKey = merged.pinKey;
+  return {
+    ...DEFAULT_TOOLTIP_CONFIG,
+    ...merged,
+    showMiniCharts: typeof merged.showMiniCharts === 'boolean' ? merged.showMiniCharts : DEFAULT_TOOLTIP_CONFIG.showMiniCharts,
+    miniChartHeight: Number.isFinite(merged.miniChartHeight) ? merged.miniChartHeight : DEFAULT_TOOLTIP_CONFIG.miniChartHeight,
+    miniChartPoints: Number.isFinite(merged.miniChartPoints) ? merged.miniChartPoints : DEFAULT_TOOLTIP_CONFIG.miniChartPoints,
+    pinKey: pinKey === 'shift' || pinKey === 'ctrl' || pinKey === 'meta' ? pinKey : DEFAULT_TOOLTIP_CONFIG.pinKey,
+    customCss: typeof merged.customCss === 'string' ? merged.customCss : DEFAULT_TOOLTIP_CONFIG.customCss,
+    htmlTemplate: typeof merged.htmlTemplate === 'string' ? merged.htmlTemplate : DEFAULT_TOOLTIP_CONFIG.htmlTemplate,
+  };
 }
 
 /**

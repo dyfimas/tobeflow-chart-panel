@@ -5,7 +5,7 @@ export { normHost, resolverHost, defaultMapping, defaultHostMapping, buscarMapeo
 export { extractMetrics, computeHostSeverity, combineHosts, collectTimestamps, extractMetricsAtTime } from './metricExtractor';
 export { sanitizeSvg, adaptSvgForDarkTheme } from './svgSanitizer';
 export { isDrawioXml, drawioToSvg } from './drawioConverter';
-export { showCustomTooltip, hideTooltip, destroyTooltip, createTooltipScope, setTooltipScope } from './tooltipManager';
+export { showCustomTooltip, hideTooltip, destroyTooltip, createTooltipScope, setTooltipScope, isTooltipPinned } from './tooltipManager';
 export type { TooltipEntry } from './tooltipManager';
 export { aggregateValues, collectAllFieldValues, findGroupedFieldValues } from './aggregation';
 export { applyDataType, colorToSeverity, resolveThresholdColor, applyValueMapping, escapeRegex } from './dataFormatter';

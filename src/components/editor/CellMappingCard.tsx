@@ -298,6 +298,16 @@ export const CellMappingCard: React.FC<CellMappingCardProps> = ({
           />
         </InlineField>
 
+        {/* Alias (tooltip title) */}
+        <InlineField label="Alias" labelWidth={8} grow tooltip={t('card.aliasTooltip')}>
+          <Input
+            value={m.label || ''}
+            onChange={(e) => updateMapping(m.id, { label: e.currentTarget.value })}
+            placeholder={t('card.aliasPlaceholder')}
+            style={{ fontSize: 12 }}
+          />
+        </InlineField>
+
         {/* Data Link */}
         <InlineField label="Link" labelWidth={8} grow tooltip={t('card.linkTooltip')}>
           <Input
@@ -327,6 +337,24 @@ export const CellMappingCard: React.FC<CellMappingCardProps> = ({
             menuPlacement="auto"
           />
         </InlineField>
+
+        {/* Skip threshold toggles (mapping-level) */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '2px 8px', marginBottom: 4 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} title={t('card.skipThresholdColorTooltip')}>
+            <Checkbox
+              value={!!m.skipThresholdColor}
+              onChange={(e) => updateMapping(m.id, { skipThresholdColor: e.currentTarget.checked })}
+            />
+            <span style={{ fontSize: 10, opacity: 0.8 }}>{t('card.skipThresholdColor')}</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} title={t('card.skipCellSeverityTooltip')}>
+            <Checkbox
+              value={!!m.skipCellSeverity}
+              onChange={(e) => updateMapping(m.id, { skipCellSeverity: e.currentTarget.checked })}
+            />
+            <span style={{ fontSize: 10, opacity: 0.8 }}>{t('card.skipCellSeverity')}</span>
+          </label>
+        </div>
 
         {/* Metrics section */}
         <div style={{ marginTop: 6 }}>

@@ -4,6 +4,10 @@
 // ─────────────────────────────────────────────────────────────
 import { HostMapping, MAPEO_HOSTS_DEFAULT } from '../types';
 
+// ── normHost cache (B3 optimisation) ────────────────────────
+const NORM_CACHE_MAX = 4096;
+const _normCache = new Map<string, string>();
+
 /**
  * Normaliza un hostname siguiendo las reglas del script de producción:
  * - Elimina sufijo -PING
@@ -11,15 +15,21 @@ import { HostMapping, MAPEO_HOSTS_DEFAULT } from '../types';
  * - Elimina puertos (:9200, etc.)
  * - Elimina caracteres especiales
  * - Convierte a minúsculas
+ *
+ * Results are cached (up to NORM_CACHE_MAX entries) so repeated
+ * calls for the same raw string are O(1).
  */
 export function normHost(raw: string): string {
   if (!raw) return '';
+  const cached = _normCache.get(raw);
+  if (cached !== undefined) return cached;
+
   let s = raw.trim();
   // Strip URL protocol (http://, https://)
   s = s.replace(/^https?:\/\//i, '');
   // Strip URL path (everything after first /)
   s = s.replace(/\/.*$/, '');
-  return s
+  const result = s
     .replace(/-PING$/i, '')
     .replace(/\.(local|lan|home|localdomain|internal)$/i, '')
     // Dominios personalizados se eliminan con regex genérico (2+ niveles)
@@ -28,6 +38,15 @@ export function normHost(raw: string): string {
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '')
     .toLowerCase();
+
+  if (_normCache.size >= NORM_CACHE_MAX) _normCache.clear();
+  _normCache.set(raw, result);
+  return result;
+}
+
+/** Exposed for tests only — clears the normHost internal cache. */
+export function _clearNormHostCache(): void {
+  _normCache.clear();
 }
 
 /**

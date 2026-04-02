@@ -87,6 +87,10 @@ export interface MetricAssignment {
   filterPattern?: string;
   /** refId de la query de Grafana para esta métrica. Si vacío, usa el del CellMapping. */
   refId?: string;
+  /** Si true, el color de esta métrica en el tooltip se muestra siempre como NORMAL (verde). */
+  skipThresholdColor?: boolean;
+  /** Si true, esta métrica no contribuye a la severidad (color) de la celda. */
+  skipCellSeverity?: boolean;
 }
 
 /** Mapeo manual de un elemento SVG a un host y métricas específicas */
@@ -105,10 +109,15 @@ export interface CellMapping {
   hostField?: string;
   /** Modo de visibilidad del elemento SVG. Default: 'always'. */
   visibility?: VisibilityMode;
+  /** Si true, todas las métricas de este mapeo se muestran en verde (ignora thresholds). */
+  skipThresholdColor?: boolean;
+  /** Si true, ninguna métrica de este mapeo contribuye al color de la celda. */
+  skipCellSeverity?: boolean;
 }
 
 /** Tooltip display mode */
 export type TooltipMode = 'detailed' | 'compact' | 'off';
+export type TooltipPinKey = 'alt' | 'shift' | 'ctrl' | 'meta';
 
 /** Configurable tooltip appearance */
 export interface TooltipConfig {
@@ -132,10 +141,62 @@ export interface TooltipConfig {
   padding: number;
   /** Opacity 0-1 (default: 0.95) */
   opacity: number;
+  /** Backdrop blur in px */
+  backdropBlur: number;
+  /** Tooltip shadow color */
+  shadowColor: string;
+  /** Tooltip shadow blur radius in px */
+  shadowBlur: number;
+  /** Tooltip header background color */
+  headerBackgroundColor: string;
   /** Show severity badge in header */
   showSeverity: boolean;
   /** Show timestamp row */
   showTimestamp: boolean;
+  /** Show tiny evolution charts per metric */
+  showMiniCharts: boolean;
+  /** Height of mini charts in px */
+  miniChartHeight: number;
+  /** Maximum number of points rendered in each mini chart */
+  miniChartPoints: number;
+  /** Key used to keep tooltip pinned and interactive */
+  pinKey: TooltipPinKey;
+  /** Extra CSS for advanced tooltip styling. Use :tooltip as the selector root. */
+  customCss: string;
+  /** Optional HTML template for tooltip content. Placeholders: {{hostname}}, {{severity}}, {{time}}, {{metricsHtml}}, {{severityColor}} */
+  htmlTemplate: string;
+}
+
+/** Visual theme configuration for the panel shell and SVG effects */
+export interface VisualStyleConfig {
+  panelBackgroundColor: string;
+  panelBorderColor: string;
+  panelBorderRadius: number;
+  panelPadding: number;
+  panelBoxShadow: string;
+  panelBackdropBlur: number;
+  hoverGlowColor: string;
+  hoverGlowRadius: number;
+  hoverBrightness: number;
+  criticalGlowColor: string;
+  criticalGlowMin: number;
+  criticalGlowMax: number;
+  criticalPulseDuration: number;
+  locateGlowColor: string;
+  locateGlowRadius: number;
+  noDataStrokeColor: string;
+  noDataStrokeDasharray: string;
+  noDataOpacity: number;
+  containerColorCritical: string;
+  containerColorMajor: string;
+  containerColorMinor: string;
+  containerColorWarning: string;
+  containerColorNormal: string;
+  containerColorNoData: string;
+  clickFlashColor: string;
+  clickFlashDuration: number;
+  /** Extra CSS for advanced panel/SVG styling. Use :scope as the selector root. */
+  customCss: string;
 }
 
 /** Opciones del panel que el usuario configura en el editor */
@@ -149,13 +210,80 @@ export interface SvgFlowOptions {
   customThresholdsJson: string;
   /** P4: Override METRICAS_CONFIG from the panel editor (JSON). */
   metricsConfigJson: string;
+  /** Editable autodiscover metric templates (JSON array of MetricAssignment). */
+  autodiscoverTemplatesJson: string;
   cellMappings: CellMapping[];
   globalThresholds: { mode: string; steps: MetricThreshold[] };
   /** Tooltip appearance configuration */
   tooltipConfig: TooltipConfig;
+  /** Panel shell and SVG visual styling */
+  visualStyle: VisualStyleConfig;
   /** Multi-SVG overlay layers (stacked on top of the base SVG) */
   layers?: SvgLayer[];
+  /** Show severity color legend overlay in a corner of the panel */
+  showSeverityLegend?: boolean;
+  /** Show a "no data" message when no metrics are available */
+  showNoDataMessage?: boolean;
+  /** Show a loading spinner while the SVG is being fetched/processed */
+  showLoadingIndicator?: boolean;
+  /** Show a visual indicator when pick-mode (cell selection) is active */
+  showPickModeIndicator?: boolean;
 }
+
+export const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
+  mode: 'detailed',
+  maxWidth: 380,
+  fontSize: 12,
+  fontFamily: 'inherit',
+  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+  textColor: '#ffffff',
+  borderColor: 'rgba(255, 255, 255, 0.1)',
+  borderRadius: 4,
+  padding: 12,
+  opacity: 0.95,
+  backdropBlur: 14,
+  shadowColor: 'rgba(0, 0, 0, 0.5)',
+  shadowBlur: 32,
+  headerBackgroundColor: 'transparent',
+  showSeverity: true,
+  showTimestamp: true,
+  showMiniCharts: true,
+  miniChartHeight: 26,
+  miniChartPoints: 40,
+  pinKey: 'alt',
+  customCss: '',
+  htmlTemplate: '',
+};
+
+export const DEFAULT_VISUAL_STYLE: VisualStyleConfig = {
+  panelBackgroundColor: 'transparent',
+  panelBorderColor: 'transparent',
+  panelBorderRadius: 0,
+  panelPadding: 0,
+  panelBoxShadow: 'none',
+  panelBackdropBlur: 0,
+  hoverGlowColor: 'rgba(255, 255, 255, 0.3)',
+  hoverGlowRadius: 8,
+  hoverBrightness: 1.15,
+  criticalGlowColor: 'rgba(218, 32, 32, 0.9)',
+  criticalGlowMin: 4,
+  criticalGlowMax: 12,
+  criticalPulseDuration: 2,
+  locateGlowColor: 'rgba(60, 140, 255, 0.9)',
+  locateGlowRadius: 35,
+  noDataStrokeColor: '#90a4ae',
+  noDataStrokeDasharray: '6 3',
+  noDataOpacity: 0.6,
+  containerColorCritical: '#da2020',
+  containerColorMajor: '#f7b911',
+  containerColorMinor: '#faec2d',
+  containerColorWarning: '#42a5f5',
+  containerColorNormal: '#2fda2f',
+  containerColorNoData: '#90a4ae',
+  clickFlashColor: '#00ff88',
+  clickFlashDuration: 600,
+  customCss: '',
+};
 
 // ─── Severidades ────────────────────────────────────────────
 
