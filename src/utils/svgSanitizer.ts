@@ -92,9 +92,9 @@ export function adaptSvgForDarkTheme(svg: string): string {
   // Fix invalid "color-scheme: light-dark;" → "color-scheme: dark;"
   out = out.replace(/color-scheme:\s*light-dark\b/gi, 'color-scheme: dark');
 
-  // Resolve CSS light-dark() — hex variant
+  // Resolve CSS light-dark() — supports hex and rgb()/hsl() with nested parens
   out = out.replace(
-    /color:\s*light-dark\(\s*([^,)]+?)\s*,\s*([^)]+?)\s*\)/gi,
+    /color:\s*light-dark\(\s*((?:[^,()]+|\([^)]*\))+)\s*,\s*((?:[^()]+|\([^)]*\))+)\s*\)/gi,
     (_match, _light: string, dark: string) => `color: ${dark.trim()}`
   );
 

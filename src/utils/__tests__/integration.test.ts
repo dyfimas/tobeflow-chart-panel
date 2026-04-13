@@ -6,7 +6,10 @@
 import { DataFrame, FieldType } from '@grafana/data';
 import { extractMetrics, computeHostSeverity } from '../metricExtractor';
 import { resolverHost, defaultMapping, defaultHostMapping } from '../hostMapping';
-import { Severity } from '../../types';
+import { Severity, resolveMetricsConfig } from '../../types';
+
+/** Metricbeat preset config — matches ES field names used in mock frames */
+const METRICBEAT_CFG = resolveMetricsConfig('{"_preset": "metricbeat"}');
 
 /**
  * Mock DataFrame generator simulating real Elasticsearch responses
@@ -89,7 +92,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         }
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
 
       expect(metrics.size).toBe(3);
       expect(metrics.has('web-server-01')).toBe(true);
@@ -112,7 +115,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         }
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
 
       // Should skip empty/null hosts
       expect(metrics.size).toBeLessThanOrEqual(2);
@@ -129,7 +132,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         }
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('host-01');
 
       // Should multiply by 100 for display
@@ -184,7 +187,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         createMockTermsFrame('sonda-PHANTOM', 0, 'B'), // DOWN
       ];
 
-      const metrics = extractMetrics(frames, 'monitor.name', 'B');
+      const metrics = extractMetrics(frames, 'monitor.name', 'B', METRICBEAT_CFG);
 
       expect(metrics.size).toBe(3);
       expect(metrics.has('sonda-BAMBOO-1')).toBe(true);
@@ -202,11 +205,11 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
       const frame1 = createMockTermsFrame('host-A', 75, 'A');
       const frame2 = createMockTermsFrame('host-B', 85, 'B');
 
-      const allMetrics = extractMetrics([frame1, frame2], 'monitor.name');
+      const allMetrics = extractMetrics([frame1, frame2], 'monitor.name', undefined, METRICBEAT_CFG);
       expect(allMetrics.size).toBe(2);
 
       // Filter by refId
-      const metricsB = extractMetrics([frame1, frame2], 'monitor.name', 'B');
+      const metricsB = extractMetrics([frame1, frame2], 'monitor.name', 'B', METRICBEAT_CFG);
       expect(metricsB.size).toBe(1);
       expect(metricsB.has('host-B')).toBe(true);
       expect(metricsB.has('host-A')).toBe(false);
@@ -226,7 +229,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         createMockTermsFrame('sonda-02', 0, 'B'),
       ];
 
-      const metrics = extractMetrics([columnFrame, ...termsFrames], 'host.name');
+      const metrics = extractMetrics([columnFrame, ...termsFrames], 'host.name', undefined, METRICBEAT_CFG);
 
       // Should have: 2 servers + 2 sondas = 4 total
       expect(metrics.size).toBeGreaterThanOrEqual(3); // May normalize some
@@ -244,7 +247,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         { 'system.cpu.total.norm.pct': [35] } // < 60 WARNING threshold
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('healthy-server');
       const severity = computeHostSeverity(host!);
 
@@ -257,7 +260,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         { 'system.cpu.total.norm.pct': [65] } // 60 < 65 < 70 (WARNING)
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('warning-server');
       const severity = computeHostSeverity(host!);
 
@@ -270,7 +273,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         { 'system.cpu.total.norm.pct': [82] } // > 80 MAJOR
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('major-server');
       const severity = computeHostSeverity(host!);
 
@@ -283,7 +286,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         { 'summary.up': [0] } // Boolean: 0 = DOWN = CRITICO
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('down-server');
       const severity = computeHostSeverity(host!);
 
@@ -300,7 +303,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         }
       );
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('mixed-server');
       const severity = computeHostSeverity(host!);
 
@@ -373,7 +376,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
     it('applies custom thresholds instead of defaults', () => {
       const frame = createMockMetricsFrame(
         ['critical-server'],
-        { 'system.cpu.total.norm.pct': [88] }
+        { 'cpu': [88] }
       );
 
       const metrics = extractMetrics([frame], 'host.name');
@@ -383,10 +386,10 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
       let severity = computeHostSeverity(host);
       expect(severity).toBe(Severity.MAJOR);
 
-      // With custom thresholds (MAJOR at 95): 88 = WARNING
+      // With custom thresholds (MAJOR at 95, WARNING at 85): 88 = WARNING
       const customThresholds = {
         'critical-server': {
-          cpu: { CRITICO: 98, MAJOR: 95 },
+          cpu: { CRITICO: 98, MAJOR: 95, WARNING: 85 },
         },
       };
       severity = computeHostSeverity(host, customThresholds);
@@ -429,7 +432,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         length: 2,
       };
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       // Should skip NaN/null hosts gracefully
       expect(metrics.size).toBeGreaterThanOrEqual(0);
     });
@@ -461,7 +464,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         length: 3,
       };
 
-      const metrics = extractMetrics([frame], 'host.name');
+      const metrics = extractMetrics([frame], 'host.name', undefined, METRICBEAT_CFG);
       const host = metrics.get('host-01');
 
       // Should pick value at max timestamp (Date.now()), not last index
@@ -484,7 +487,7 @@ describe('Integration Tests – Real Elasticsearch Data', () => {
         length: 2,
       };
 
-      const metrics = extractMetrics([frame], 'monitor.name', 'B');
+      const metrics = extractMetrics([frame], 'monitor.name', 'B', METRICBEAT_CFG);
       const sonda = metrics.get('sonda-HEARTBEAT');
 
       // Should store under both '_value' (fallback) and '_value:B' (namespaced)

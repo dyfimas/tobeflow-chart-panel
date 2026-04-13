@@ -117,6 +117,9 @@ export function extractMetrics(
   const isCustomHostField = !standardHostFields.includes(hostFieldName);
 
   for (const frame of series) {
+    // Skip frames with no fields (nothing useful to extract)
+    if (frame.fields.length === 0) continue;
+
     // Filter by refId if specified
     if (filterRefId && frame.refId && frame.refId !== filterRefId) {
       continue;

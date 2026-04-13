@@ -11,7 +11,7 @@
     },
     "keywords": ["tobeflow", "svg", "flow", "chart", "diagram", "topology", "infrastructure", "monitoring", "visualization"],
     "version": "1.3.0",
-    "updated": "2026-04-02",
+    "updated": "2026-04-13",
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
@@ -28,6 +28,10 @@
       {
         "name": "documentation",
         "url": "https://github.com/dyfimas/tobeflow-chart-panel/blob/master/README.md"
+      },
+      {
+        "name": "sponsor",
+        "url": "https://tobeit.es"
       }
     ],
     "screenshots": [

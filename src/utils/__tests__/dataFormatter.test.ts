@@ -6,11 +6,11 @@ import { applyDataType, resolveThresholdColor, applyValueMapping, escapeRegex, c
 import { Severity, MetricThreshold } from '../../types';
 
 describe('applyDataType', () => {
-  it('auto: detects pct100 range (1-100)', () => {
+  it('auto: values >= 1 are NOT auto-detected as percentage', () => {
     const result = applyDataType(75.5, 'auto');
     expect(result.value).toBe(75.5);
-    expect(result.unit).toBe('%');
-    expect(result.isPercentage).toBe(true);
+    expect(result.unit).toBe('');
+    expect(result.isPercentage).toBe(false);
   });
 
   it('auto: detects pct1 range (0-1 exclusive)', () => {
