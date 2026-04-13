@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [1.3.1] - 2026-04-13
+
+### Correcciones
+
+- **Fix light-dark CSS**: Regex de `adaptSvgForDarkTheme` ahora soporta `rgb()` con paréntesis anidados.
+- **Fix empty DataFrame**: Guard para frames sin campos que evita extracciones espurias.
+- **Fix integration tests**: Tests actualizados para usar preset Metricbeat con campos Elasticsearch reales.
+- **Fix dataFormatter auto**: El modo `auto` ya no asume porcentaje para valores ≥1.
+
+### Publicación
+
+- **CI/CD**: Workflows de GitHub Actions para CI (typecheck+test+build) y Release (firma community + SHA1 + attestation).
+- **Firma community**: Plugin firmado bajo `community` signature level para publicación en grafana.com.
+- **Sponsor link**: Añadido enlace de patrocinio en plugin.json.
+
+---
+
 ## [1.3.0] - 2026-03-11
 
 ### Nuevas funcionalidades

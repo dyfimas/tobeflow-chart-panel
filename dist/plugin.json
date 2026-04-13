@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "panel",
   "name": "ToBeFlow Chart Panel",
-  "id": "tobeit-tobeflow-panel",
+  "id": "tobeflow-chart-panel",
   "info": {
     "description": "Interactive SVG panel with data-driven coloring, tooltips and host mapping. Visualize infrastructure on custom SVG diagrams with real-time metrics.",
     "author": {
