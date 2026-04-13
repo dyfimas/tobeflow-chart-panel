@@ -48,6 +48,9 @@ jobs:
 
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
+      - name: Generate checksum
+        run: sha1sum "$ARCHIVE" > "${ARCHIVE}.sha1"
+
       - name: Generate provenance attestation
         uses: actions/attest-build-provenance@v2
         with:
@@ -56,5 +59,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ARCHIVE }}
+          files: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha1
           generate_release_notes: true
