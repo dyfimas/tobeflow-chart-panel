@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Sign plugin
-        run: npx @grafana/sign-plugin@latest
+        run: npx @grafana/sign-plugin@latest --rootUrls https://grafana.tobeit.es
         env:
           GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
 

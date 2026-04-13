@@ -1,6 +1,6 @@
 {
   "name": "tobeit-tobeflow-panel",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "ToBeFlow Chart Panel – Interactive SVG with data-driven coloring, tooltips and host mapping",
   "author": "ToBeIT",
   "license": "Apache-2.0",
