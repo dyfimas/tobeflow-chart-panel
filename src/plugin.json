@@ -28,6 +28,10 @@
       {
         "name": "documentation",
         "url": "https://github.com/dyfimas/tobeflow-chart-panel/blob/master/README.md"
+      },
+      {
+        "name": "sponsor",
+        "url": "https://tobeit.es"
       }
     ],
     "screenshots": [
