@@ -1,0 +1,37 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+{
+  "manifestVersion": "2.0.0",
+  "signatureType": "private",
+  "signedByOrg": "tobeit",
+  "signedByOrgName": "tobeit",
+  "rootUrls": [
+    "https://grafana.tobeit.es/"
+  ],
+  "plugin": "tobeit-tobeflow-panel",
+  "version": "1.3.2",
+  "time": 1776118700709,
+  "keyId": "7e4d0c6a708866e7",
+  "files": {
+    "plugin.json": "54f74f9e633063dcbb107ab3deda6daf73a165d6cc7e8ccd41abad1c225c715c",
+    "module.js": "8eb37ebf0425e8732aac561f0a3fd643800bcdfb219e8db2b023ffa19903a665",
+    "README.md": "4df5acc89373d6bc7c486b61bcf2aa53b5c723acdcb8f98e47c8518181f2418b",
+    "module.js.LICENSE.txt": "f109df7bf2546e32c4b87c143103de762d2c84c04ef0c7a41b7b8d07b4d2a6c1",
+    "CHANGELOG.md": "4447e217f8884c717996d1795642ff188ee81eee5f53a37dfd66f7903c78bd91",
+    "LICENSE": "975f8b715667c84b3eb80e871224ff1e6bb028ea96a3f4843ca196456ca61f2f",
+    "module.js.map": "90f6948fec1b787ffc376da38aab6984523ff86ae703c8edba5d9294b52c9bd5",
+    "img/example-datacenter.svg": "4ea36172de1a19deb57cf7d0a4937a3fb9f517d1538c7f6bb84dc8d3e5839ddb",
+    "img/logo.svg": "632f1484ca6f048ec61a3570d77eca5d6c2ef3ba8bfc2ef568eb24a7481c573c"
+  }
+}
+-----BEGIN PGP SIGNATURE-----
+
+wsA+BAETCgBtBYJp3WusCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
+aW9ucy5vcGVucGdwanMub3JnoKpKUDxq5eIJvnFdEWTmZwxpo4Slwv5q9YfS
+kq3JXfsWIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAAscQCB05Rk3iknvDJA1wC
+KbDSI9jYrARuLQKUPpYWlYc/a057EomZpVkYjL531feUEYOV50yA2wkeN7WM
+d6QPGzgsA+RBAgkBNKkzfg8MhxQ6nfbC0UcRodafKkmMFl85/QqszRO3rC8X
+wArvdINvuvOAu9/qzkSuS0bOeD5NQTTIo2jPRbBoAxY=
+=IUjB
+-----END PGP SIGNATURE-----
